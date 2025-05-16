@@ -6,6 +6,8 @@ import MangadexApi.Data.TokenInfo
 import io.ktor.client.*
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.statement.HttpResponse
@@ -17,6 +19,9 @@ import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.get
+import io.ktor.client.request.parameter
+import io.ktor.http.URLProtocol
 
 class Client(
     private val username: String,
@@ -64,7 +69,9 @@ class Client(
         }
     }
 
-
+    /**
+     * Fetches an auth token for the client. Should be called prior to any other object usages
+     */
     suspend fun fetchTokens() {
         val formParameters: Parameters = Parameters.build {
             append("grant_type", "password")
@@ -87,23 +94,37 @@ class Client(
         val body = response.body<TokenInfo>()
         accessToken = body.accessToken
         refreshToken = body.refreshToken
+        println("accessToken: $accessToken\nrefreshToken: $refreshToken")
     }
 
-    suspend fun sendRequest(
-        endpoint: String,
-        parameters: Parameters,
-        requireAuth: Boolean = true,
-        method: HttpMethod = HttpMethod.Post,
-        contentType: String = "application/json",
-        body: Any? = null
-    ) {
 
+    /**
+     * @param limit Default 10; Max 100
+     * @param offset Might throw an error if offset is past the amount?
+     */
+    suspend fun getFollowedMangaList(limit: Int = 10, offset: Int = 0): HttpResponse{
+        return httpClient.get(){
+            url{
+                protocol = URLProtocol.HTTPS
+                host = "api.mangadex.org"
+                pathSegments = listOf("user","follows","manga")
+                Parameters.build{
+                    append("limit", limit.toString())
+                    append("offset", offset.toString())
+                }
+            }
+        }
     }
 
-    suspend fun handleRatelimit(response: HttpResponse) {
-
+    /**
+     *
+     */
+    suspend fun getAllFollowedManga(perFetchLimit: Int = 100, initialOffset: Int = 0){
+        
     }
-
+    /**
+     * Function to determine if a endpoint needs auth headers. Unifnished
+      */
     private fun urlRequiresAuth(request: HttpRequestBuilder) : Boolean {
         if(request.url.host == "api.mangadex.org") return false
         if(request.url.pathSegments.isEmpty()) return false

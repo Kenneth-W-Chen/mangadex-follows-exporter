@@ -169,7 +169,7 @@ class Client(
                 }
             }
 
-            delay(3000)
+            delay(1000)
         } while (currentOffset <= expectedTotal && !emptyDataReturned)
 
         return mangaList

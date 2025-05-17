@@ -1,4 +1,5 @@
 secrets.properties
+My_MangaDex_Follows_*
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar

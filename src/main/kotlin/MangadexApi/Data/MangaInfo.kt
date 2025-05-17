@@ -25,16 +25,8 @@ data class MangaInfo(
     val attributes: MangaAttributes,
     val relationships: Array<JsonObject>
 ) {
-    fun toSimplifiedMangaInfo(preferRomaji: Boolean = false): SimplifiedMangaInfo {
+    fun toSimplifiedMangaInfo(titleLocalePreference: Array<String> = arrayOf("ja", "ja-ro", "ko", "ko-ro", "zh", "zh-hk", "zh-ro", "en")): SimplifiedMangaInfo {
         var title: String = attributes.title.values.first().toString()
-        val languageCodesRomaji: Array<String> = arrayOf("ja-ro", "ko-ro", "zh-ro")
-        val languageCodes: Array<String> = arrayOf("ja", "ko", "zh", "zh-hk")
-        var languageCodePriorities: Array<String>
-        if (preferRomaji) {
-            languageCodePriorities = languageCodesRomaji.plus(languageCodes).plus("en")
-        } else {
-            languageCodePriorities = languageCodes.plus(languageCodesRomaji).plus("en")
-        }
 
         /**
          * All this stupid logic is to deal with this stupid notation:
@@ -69,7 +61,7 @@ data class MangaInfo(
          *
          * And I'm not writing my own reserializing logic for this garbage.
          */
-        for (locale in languageCodePriorities) {
+        for (locale in titleLocalePreference) {
             if (attributes.title[locale].toString() != "null") {
                 title = attributes.title[locale].toString()
                 break

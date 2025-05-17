@@ -134,6 +134,7 @@ class Client(
         var mangaList: MutableList<SimplifiedMangaInfo> = mutableListOf()
         do {
             for (i in 1..5) {
+                println("Fetching titles. Current index: $currentOffset")
                 var response: HttpResponse = getFollowedMangaList(perFetchLimit, currentOffset)
                 var body = response.body<String>()
 //                println("\n--------------------\nReceived response: $response for offset $currentOffset\n$body")
@@ -154,12 +155,14 @@ class Client(
                     for(manga in responseBody.data){
                         mangaList.add(manga.toSimplifiedMangaInfo())
                     }
+                    println("Received " + responseBody.data.size + " titles.")
 //                    var responseSize = responseBody.data.size
 //                    var currentSize = mangaList.size
 //                    var oldOffset = currentOffset
                     currentOffset += responseBody.data.size
 //                    println("Added $responseSize to mangaList ($prevSize -> $currentSize). Offset updated ($oldOffset -> $currentOffset)")
                     stepCount++
+
                 } else {
                     throw Exception("Unexpected HTTP Response: ${response.status}")
                 }

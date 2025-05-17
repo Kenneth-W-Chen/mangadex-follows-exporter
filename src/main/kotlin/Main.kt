@@ -19,7 +19,10 @@ suspend fun main() {
     val client:Client = Client(secrets.getProperty("username"), secrets.getProperty("password"), secrets.getProperty("client-id"), secrets.getProperty("client-secret"))
     client.fetchTokens()
     var list = client.getAllFollowedManga()
-    writeToFile(list)
+    val config: Properties = Properties()
+    config.load(FileInputStream("config.properties"))
+    val saveLinks: List<Links> = config.getProperty("links").split(",").map({ Links.valueOf(it) })
+    writeToFile(list, "My_MangaDex_Follows", saveLinks)
 }
 enum class Links{
     al,

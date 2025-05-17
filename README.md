@@ -23,4 +23,6 @@ client-secret=<your_client_secret>
 ```properties
 links=mu,nu,al,ap
 ```
-*See [this link](https://api.mangadex.org/docs/3-enumerations/#manga-links-data) for the link naming definitions*
+An [example file](https://github.com/Kenneth-W-Chen/mangadex-follows-exporter/blob/main/config.properties) is provided in this repository. It saves all of the links.
+
+*See [this link](https://api.mangadex.org/docs/3-enumerations/#manga-links-data) for the link naming definitions.*

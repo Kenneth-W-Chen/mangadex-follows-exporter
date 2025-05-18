@@ -25,10 +25,33 @@ class SettingsManager {
         }
     }
 
+    fun saveSettings(settings: Map<SettingsKeys, String>) {
+        for((key, value) in settings) {
+            config.setProperty(key.name, value)
+        }
+        FileOutputStream("config.properties", false).use { s ->
+            config.store(s, null)
+        }
+    }
+
+    fun loadSettings() {
+        FileInputStream("config.properties").use { s ->
+            config.load(s)
+        }
+    }
+
     enum class SecretsKeys{
         MD_USERNAME,
         MD_PASSWORD,
         MD_API_CLIENT_ID,
         MD_API_CLIENT_SECRET,
+    }
+
+    enum class SettingsKeys{
+        EXPORT,
+        LINKS,
+        LOCALE_PREFERENCE,
+        INITIAL_OFFSET,
+        FETCH_LIMIT
     }
 }

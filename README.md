@@ -14,14 +14,19 @@ This program expects 2 files (both located in the directory the executable is in
 1. Follow the steps outlined [here](https://api.mangadex.org/docs/02-authentication/personal-clients/#registering-an-api-client) to get API client credentials.
 2. In `secrets.properties`, add the following lines (replace with your info): 
 ```properties
-username=<your_username>
-password=<your_password>
-client-id=<your_client_id>
-client-secret=<your_client_secret>
+MD_USERNAME=<your_username>
+MD_PASSWORD=<your_password>
+MD_API_CLIENT_ID=<your_client_id>
+MD_API_CLIENT_SECRET=<your_client_secret>
 ```
-3. In `config.properties`, add/remove the links you want saved. Syntax:
+3. Update `config.properties`. Syntax:
 ```properties
-links=mu,nu,al,ap
+EXPORT=txt,csv,MangaUpdates
+FETCH_LIMIT=100
+INITIAL_OFFSET=0
+LINKS=Amazon,AniList,Anime-Planet,Book Walker,CDJapan,eBookJapan,Kitsu,MangaUpdates,MyAnimeList,NovelUpdates,Official English,Raws
+LOCALE_PREFERENCE=en,ja-ro,ja,ko-ro,ko,zh-ro
+
 ```
 An [example file](https://github.com/Kenneth-W-Chen/mangadex-follows-exporter/blob/main/config.properties) is provided in this repository. It saves all of the links.
 

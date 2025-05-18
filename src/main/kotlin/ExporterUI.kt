@@ -7,7 +7,6 @@ import java.awt.GridLayout
 import java.awt.Insets
 import java.awt.event.ActionEvent
 import javax.swing.*
-import javax.swing.border.CompoundBorder
 import javax.swing.border.EmptyBorder
 
 class ExporterUI : JFrame("Mangadex Follows Exporter") {
@@ -17,12 +16,14 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     var passwordField: JTextField = JTextField()
     var apiClientIdField: JTextField = JTextField()
     var apiClientSecretField: JTextField = JTextField()
-    var exportOptions: Array<JCheckBox> = arrayOf(
+    var exportOptionCheckboxes: Array<JCheckBox> = arrayOf(
         JCheckBox("txt"),
         JCheckBox("csv"),
         JCheckBox("MangaUpdates")
     )
-    var linksOptions: Array<JCheckBox> = arrayOf(
+    val exportAllCheckBox = JCheckBox("All")
+
+    var linksOptionCheckboxes: Array<JCheckBox> = arrayOf(
         JCheckBox("Amazon"),
         JCheckBox("AniList"),
         JCheckBox("Anime-Planet"),
@@ -36,6 +37,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         JCheckBox("Official English"),
         JCheckBox("Raws"),
     )
+    val linksAllCheckBox = JCheckBox("All")
 
     var locales: DefaultListModel<String> = DefaultListModel<String>()
     val initialOffsetField: JTextField = JTextField()
@@ -152,17 +154,109 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     }
 
     private fun addSettingsSection() {
-        val settingsPanel = JPanel()
-        settingsPanel.layout = BoxLayout(settingsPanel, BoxLayout.X_AXIS)
-        settingsPanel.alignmentX = CENTER_ALIGNMENT
-        settingsPanel.alignmentY = TOP_ALIGNMENT
-        settingsPanel.add(getExportOptionsPanel())
-        settingsPanel.add(getLinkOptionsPanel())
-        settingsPanel.add(getLocaleOptionsPanel())
-        settingsPanel.add(getAPIOptionsPanel())
+        val settingsContentPanel = JPanel()
+        settingsContentPanel.layout = BoxLayout(settingsContentPanel, BoxLayout.X_AXIS)
+        settingsContentPanel.alignmentX = CENTER_ALIGNMENT
+        settingsContentPanel.alignmentY = TOP_ALIGNMENT
+        settingsContentPanel.add(getExportOptionsPanel())
+        settingsContentPanel.add(getLinkOptionsPanel())
+        settingsContentPanel.add(getLocaleOptionsPanel())
+        settingsContentPanel.add(getAPIOptionsPanel())
+
+        val settingsMainPanel = JPanel()
+        settingsMainPanel.layout = BoxLayout(settingsMainPanel, BoxLayout.Y_AXIS)
+        settingsMainPanel.alignmentX = CENTER_ALIGNMENT
+        settingsMainPanel.alignmentY = TOP_ALIGNMENT
+        settingsMainPanel.add(settingsContentPanel)
+
+        // settings save/load buttons
+        val settingsSubcontentPanel = JPanel()
+        settingsSubcontentPanel.layout = BoxLayout(settingsSubcontentPanel, BoxLayout.X_AXIS)
+        settingsSubcontentPanel.alignmentX = CENTER_ALIGNMENT
+        settingsSubcontentPanel.alignmentY = TOP_ALIGNMENT
+        settingsMainPanel.add(settingsSubcontentPanel)
+
+        val saveButton = JButton("Save Settings")
+        saveButton.alignmentX = CENTER_ALIGNMENT
+        saveButton.alignmentY = CENTER_ALIGNMENT
+        saveButton.addActionListener {
+            var exportSetting: String = ""
+            for (exportOptionCheckbox in exportOptionCheckboxes) {
+                if (exportOptionCheckbox.isSelected)
+                    exportSetting += exportOptionCheckbox.text + ","
+            }
+            exportSetting = exportSetting.removeSuffix(",")
+            var linksSetting: String = ""
+            for (linkCheckbox in linksOptionCheckboxes) {
+                if (linkCheckbox.isSelected)
+                    linksSetting += linkCheckbox.text + ","
+            }
+            linksSetting = linksSetting.removeSuffix(",")
+
+            var localePreferenceSetting: String = ""
+            for (i in 0..locales.size() - 1) {
+                localePreferenceSetting += locales.get(i) + ","
+            }
+            localePreferenceSetting = localePreferenceSetting.removeSuffix(",")
+
+            settings.saveSettings(
+                mapOf(
+                    SettingsManager.SettingsKeys.EXPORT to exportSetting,
+                    SettingsManager.SettingsKeys.LINKS to linksSetting,
+                    SettingsManager.SettingsKeys.LOCALE_PREFERENCE to localePreferenceSetting,
+                    SettingsManager.SettingsKeys.INITIAL_OFFSET to initialOffsetField.text,
+                    SettingsManager.SettingsKeys.FETCH_LIMIT to fetchLimitField.text,
+                )
+            )
+            // todo log completion
+        }
+        settingsSubcontentPanel.add(saveButton)
+        //todo add filler
+        val loadButton = JButton("Load Settings")
+        loadButton.alignmentX = CENTER_ALIGNMENT
+        loadButton.alignmentY = CENTER_ALIGNMENT
+        loadButton.addActionListener {
+            settings.loadSettings()
+            val exportOptions = settings.config.get(SettingsManager.SettingsKeys.EXPORT.name).toString().split(",")
+            if (exportOptions.isNotEmpty()) {
+                exportOptionCheckboxes.forEach{it.isSelected = exportOptions.contains(it.text)}
+                if(exportOptionCheckboxes.any({ !it.isSelected })){
+                    exportAllCheckBox.isSelected = false
+
+                } else{
+                    exportAllCheckBox.isSelected = true
+                }
+            }
+
+            val linksOptions = settings.config.get(SettingsManager.SettingsKeys.LINKS.name).toString().split(",")
+            if (linksOptions.isNotEmpty()) {
+                linksOptionCheckboxes.forEach{it.isSelected = linksOptions.contains(it.text)}
+                if(linksOptionCheckboxes.any({ !it.isSelected })){
+                    linksAllCheckBox.isSelected = false
+                } else{
+                    linksAllCheckBox.isSelected = true
+                }
+            }
+            val localePreferenceOption = settings.config.get(SettingsManager.SettingsKeys.LOCALE_PREFERENCE.name).toString().split(",")
+            if (localePreferenceOption.isNotEmpty()) {
+                if(locales.size() > localePreferenceOption.size){
+                    locales.removeRange(localePreferenceOption.size, localePreferenceOption.size)
+                }
+                for(i in 0..locales.size()-1) {
+                    locales[i] = localePreferenceOption[i]
+                }
+                if(locales.size() < localePreferenceOption.size) {
+                    locales.addAll(localePreferenceOption.subList(locales.size, localePreferenceOption.size))
+                }
+            }
+
+            initialOffsetField.text = settings.config.get(SettingsManager.SettingsKeys.INITIAL_OFFSET.name).toString()
+            fetchLimitField.text = settings.config.get(SettingsManager.SettingsKeys.FETCH_LIMIT.name).toString()
 
 
-        mainPanel.add(settingsPanel)
+        }
+        settingsSubcontentPanel.add(loadButton)
+        mainPanel.add(settingsMainPanel)
     }
 
     private fun getExportOptionsPanel(): JPanel {
@@ -174,13 +268,27 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         var exportLabel = JLabel("Export to")
         exportLabel.labelFor = exportPanel
         exportPanel.add(exportLabel)
-        for (checkbox in exportOptions) {
+        for (checkbox in exportOptionCheckboxes) {
             exportPanel.add(checkbox)
+            checkbox.addActionListener {
+                if (!checkbox.isSelected) {
+                    exportAllCheckBox.isSelected = false
+                } else {
+                    exportAllCheckBox.isSelected = exportOptionCheckboxes.all({ it.isSelected })
+                }
+            }
         }
+        exportAllCheckBox.addActionListener {
+            for (checkbox in exportOptionCheckboxes) {
+                checkbox.isSelected = exportAllCheckBox.isSelected
+            }
+        }
+        exportPanel.add(exportAllCheckBox)
+
         return exportPanel
     }
 
-    private fun getLinkOptionsPanel():JPanel {
+    private fun getLinkOptionsPanel(): JPanel {
 
         var linksPanel = JPanel()
         linksPanel.layout = BoxLayout(linksPanel, BoxLayout.Y_AXIS)
@@ -192,7 +300,12 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 
         var linksCheckBoxPanel = JPanel()
         linksCheckBoxPanel.layout = BoxLayout(linksCheckBoxPanel, BoxLayout.Y_AXIS)
-        for (linkCheckbox in linksOptions) {
+        linksAllCheckBox.toolTipText = "Select to save all of the links. Deselect to save none of the links."
+        linksAllCheckBox.addActionListener {
+            linksOptionCheckboxes.forEach { checkbox -> checkbox.isSelected = linksAllCheckBox.isSelected }
+        }
+        linksCheckBoxPanel.add(linksAllCheckBox)
+        for (linkCheckbox in linksOptionCheckboxes) {
             linksCheckBoxPanel.add(linkCheckbox)
         }
         val linksScrollPane: JScrollPane = JScrollPane(linksCheckBoxPanel)
@@ -205,12 +318,12 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     }
 
     private fun getLocaleOptionsPanel(): JPanel {
-        var titleLocaleMainPanel = JPanel()
+        val titleLocaleMainPanel = JPanel()
         titleLocaleMainPanel.layout = BoxLayout(titleLocaleMainPanel, BoxLayout.Y_AXIS)
         titleLocaleMainPanel.alignmentY = TOP_ALIGNMENT
 
         // panel header
-        var titleLabel = JLabel("Title Locale Preference")
+        val titleLabel = JLabel("Title Locale Preference")
         titleLabel.labelFor = titleLocaleMainPanel
         titleLocaleMainPanel.add(titleLabel)
 
@@ -219,16 +332,16 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             locales.addElement(l)
         }
 
-        var titleLocaleContentPanel = JPanel()
+        val titleLocaleContentPanel = JPanel()
         titleLocaleContentPanel.layout = GridBagLayout()
         titleLocaleContentPanel.alignmentX = LEFT_ALIGNMENT
         titleLocaleContentPanel.border = BorderFactory.createLineBorder(Color.DARK_GRAY)
         titleLocaleContentPanel.maximumSize = Dimension(140, 130)
 
-        var localeJList = JList(locales)
+        val localeJList = JList(locales)
         localeJList.selectionMode = ListSelectionModel.SINGLE_SELECTION
 
-        var localeScrollPane: JScrollPane = JScrollPane(localeJList)
+        val localeScrollPane: JScrollPane = JScrollPane(localeJList)
         localeScrollPane.minimumSize = Dimension(70, 130)
         localeScrollPane.maximumSize = Dimension(70, 130)
         localeScrollPane.verticalScrollBar.unitIncrement = 10
@@ -243,10 +356,10 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         })
 
         // list interaction buttons
-        var upButton = JButton("UP")
+        val upButton = JButton("UP")
         upButton.addActionListener {
-            if(localeJList.selectedIndex != 0){
-                locales.swap(localeJList.selectedIndex, localeJList.selectedIndex-1)
+            if (localeJList.selectedIndex >= 0) {
+                locales.swap(localeJList.selectedIndex, localeJList.selectedIndex - 1)
                 localeJList.selectedIndex--
             }
         }
@@ -263,8 +376,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 
         var downButton = JButton("DOWN")
         downButton.addActionListener {
-            if(localeJList.selectedIndex != locales.size - 1){
-                locales.swap(localeJList.selectedIndex, localeJList.selectedIndex+1)
+            if (localeJList.selectedIndex != locales.size - 1 && localeJList.selectedIndex >= 0) {
+                locales.swap(localeJList.selectedIndex, localeJList.selectedIndex + 1)
                 localeJList.selectedIndex++
             }
         }
@@ -314,11 +427,11 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             weighty = 0.5
             anchor = GridBagConstraints.FIRST_LINE_START
         })
-        val insert: Action = object: AbstractAction(){
+        val insert: Action = object : AbstractAction() {
             override fun actionPerformed(e: ActionEvent) {
-                if(addLocaleField.text.isNotEmpty() && !locales.contains(addLocaleField.text)){
+                if (addLocaleField.text.isNotEmpty() && !locales.contains(addLocaleField.text)) {
                     var index = localeJList.selectedIndex
-                    if(index < 0) {
+                    if (index < 0) {
                         index = 0
                     }
                     locales.insertElementAt(addLocaleField.text, index)
@@ -346,7 +459,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         return titleLocaleMainPanel
     }
 
-    private fun getAPIOptionsPanel(): JPanel{
+    private fun getAPIOptionsPanel(): JPanel {
         val apiOptionsPanel = JPanel()
         apiOptionsPanel.layout = BoxLayout(apiOptionsPanel, BoxLayout.Y_AXIS)
         apiOptionsPanel.alignmentX = CENTER_ALIGNMENT
@@ -358,13 +471,14 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 
         val apiOptionsContentPanel = JPanel()
         apiOptionsContentPanel.layout = BoxLayout(apiOptionsContentPanel, BoxLayout.Y_AXIS)
-        apiOptionsContentPanel.border = EmptyBorder(0,10,0,0)
+        apiOptionsContentPanel.border = EmptyBorder(0, 10, 0, 0)
 
         // offset setting
         val offsetLabel = JLabel("Initial Offset")
         offsetLabel.labelFor = initialOffsetField
         apiOptionsContentPanel.add(offsetLabel)
-        initialOffsetField.toolTipText = "Sets the starting point for the fetching process. Setting it to 0 fetches everything."
+        initialOffsetField.toolTipText =
+            "Sets the starting point for the fetching process. Setting it to 0 fetches everything."
         initialOffsetField.maximumSize = Dimension(100, 30)
         initialOffsetField.margin = Insets(0, 10, 0, 0)
         initialOffsetField.alignmentX = LEFT_ALIGNMENT
@@ -374,7 +488,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         val fetchLimitLabel = JLabel("Fetch Limit")
         fetchLimitLabel.labelFor = fetchLimitField
 
-        fetchLimitField.toolTipText = "Sets a limit on how many manga are fetched per API call. Minimum is 1, and the maximum is 100."
+        fetchLimitField.toolTipText =
+            "Sets a limit on how many manga are fetched per API call. Minimum is 1, and the maximum is 100."
         fetchLimitField.maximumSize = Dimension(100, 30)
         fetchLimitField.alignmentX = LEFT_ALIGNMENT
         apiOptionsContentPanel.add(fetchLimitLabel)
@@ -386,6 +501,6 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 }
 
 
-fun<T> DefaultListModel<T>.swap(index1: Int, index2: Int) {
+fun <T> DefaultListModel<T>.swap(index1: Int, index2: Int) {
     set(index1, set(index2, elementAt(index1)))
 }

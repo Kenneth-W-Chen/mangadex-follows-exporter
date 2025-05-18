@@ -1,3 +1,16 @@
+import MangadexApi.Data.MangaInfoResponse
+import MangadexApi.Data.SimplifiedMangaInfo
+import Utilities.ExportOptions
+import Utilities.Links
+import Utilities.exportMangaList
+import io.ktor.client.call.body
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.isSuccess
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.future.future
 import java.awt.Color
 import java.awt.Dimension
 import java.awt.Font
@@ -6,12 +19,15 @@ import java.awt.GridBagLayout
 import java.awt.GridLayout
 import java.awt.Insets
 import java.awt.event.ActionEvent
+import java.util.EnumSet
+import java.util.concurrent.CompletableFuture
 import javax.swing.*
 import javax.swing.border.CompoundBorder
 import javax.swing.border.EmptyBorder
 import javax.swing.border.LineBorder
 import javax.swing.text.Style
 import javax.swing.text.StyleConstants
+import kotlin.text.toInt
 
 class ExporterUI : JFrame("Mangadex Follows Exporter") {
     val windowMinWidth: Int = 600
@@ -29,20 +45,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     )
     val exportAllCheckBox = JCheckBox("All")
 
-    var linksOptionCheckboxes: Array<JCheckBox> = arrayOf(
-        JCheckBox("Amazon"),
-        JCheckBox("AniList"),
-        JCheckBox("Anime-Planet"),
-        JCheckBox("Book Walker"),
-        JCheckBox("CDJapan"),
-        JCheckBox("eBookJapan"),
-        JCheckBox("Kitsu"),
-        JCheckBox("MangaUpdates"),
-        JCheckBox("MyAnimeList"),
-        JCheckBox("NovelUpdates"),
-        JCheckBox("Official English"),
-        JCheckBox("Raws"),
-    )
+    var linksOptionCheckboxes: Array<JCheckBox> = Links.entries.map({ l -> JCheckBox(l.canonicalName) }).toTypedArray()
     val linksAllCheckBox = JCheckBox("All")
 
     var locales: DefaultListModel<String> = DefaultListModel<String>()
@@ -56,7 +59,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     }
 
     val settings: SettingsManager = SettingsManager()
-    lateinit var mdClient: MangadexApi.Client
+    lateinit var runWorker: MangadexApiClientWorker
 
     init {
         initializeFrame()
@@ -283,7 +286,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         exportPanel.layout = BoxLayout(exportPanel, BoxLayout.Y_AXIS)
         exportPanel.alignmentY = TOP_ALIGNMENT
 
-        var exportLabel = JLabel("Export to")
+        val exportLabel = JLabel("Export to")
         exportLabel.labelFor = exportPanel
         exportPanel.add(exportLabel)
         for (checkbox in exportOptionCheckboxes) {
@@ -308,15 +311,15 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 
     private fun getLinkOptionsPanel(): JPanel {
 
-        var linksPanel = JPanel()
+        val linksPanel = JPanel()
         linksPanel.layout = BoxLayout(linksPanel, BoxLayout.Y_AXIS)
         linksPanel.alignmentY = TOP_ALIGNMENT
 
-        var linksLabel = JLabel("Links to Save")
+        val linksLabel = JLabel("Links to Save")
         linksLabel.labelFor = linksPanel
         linksPanel.add(linksLabel)
 
-        var linksCheckBoxPanel = JPanel()
+        val linksCheckBoxPanel = JPanel()
         linksCheckBoxPanel.layout = BoxLayout(linksCheckBoxPanel, BoxLayout.Y_AXIS)
         linksAllCheckBox.toolTipText = "Select to save all of the links. Deselect to save none of the links."
         linksAllCheckBox.addActionListener {
@@ -392,7 +395,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             ipadx = 3
         })
 
-        var downButton = JButton("DOWN")
+        val downButton = JButton("DOWN")
         downButton.addActionListener {
             if (localeJList.selectedIndex != locales.size - 1 && localeJList.selectedIndex >= 0) {
                 locales.swap(localeJList.selectedIndex, localeJList.selectedIndex + 1)
@@ -529,6 +532,10 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         runButton.alignmentX = CENTER_ALIGNMENT
         runButton.maximumSize = Dimension(1170, 30)
         runButton.addActionListener {
+            if(this::runWorker.isInitialized && runWorker.running) {
+                logArea.append("Already running.\n", LogType.WARNING)
+                return@addActionListener
+            }
             if(usernameField.text.isEmpty()) {
                 logArea.append("Username is empty.\n", LogType.ERROR)
                 return@addActionListener
@@ -549,7 +556,43 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
                 logArea.append("No export option selected.\n", LogType.ERROR)
                 return@addActionListener
             }
-            //todo use api client
+            var fetchLimit = fetchLimitField.text.toIntOrNull()
+            if(fetchLimit == null){
+                if(fetchLimitField.text.isNotEmpty()){
+                    logArea.append("Fetch limit wasn't set to a number.\n", LogType.ERROR)
+                    return@addActionListener
+                }
+                fetchLimit = 100
+            }
+            var initialOffset = initialOffsetField.text.toIntOrNull()
+            if(initialOffset == null){
+                if(initialOffsetField.text.isNotEmpty()){
+                    logArea.append("Initial offset wasn't set to a number.\n", LogType.ERROR)
+                    return@addActionListener
+                }
+                initialOffset = 0
+            }
+            val exportOptions = EnumSet.noneOf(ExportOptions::class.java)
+            for(checkbox in exportOptionCheckboxes){
+                exportOptions.add(ExportOptions.entries.find { it.name == checkbox.text.uppercase() })
+            }
+            logArea.append(exportOptions.toString())
+            val saveLinks = EnumSet.noneOf(Links::class.java)
+            for(checkbox in linksOptionCheckboxes){
+                saveLinks.add(Links.entries.find{it.canonicalName == checkbox.text})
+            }
+            logArea.append(saveLinks.toString())
+            runWorker = MangadexApiClientWorker(
+                MangadexApi.Client(usernameField.text, passwordField.text, apiClientIdField.text, apiClientSecretField.text),
+                logArea,
+                fetchLimit,
+                initialOffset,
+                locales.toStringArray(),
+                "My_MangaDex_Follows",
+                exportOptions,
+                saveLinks
+            )
+            runWorker.execute()
         }
         logPanel.add(runButton)
 
@@ -564,6 +607,95 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         scrollPane.border = null
         logPanel.add(scrollPane)
     }
+}
+
+class MangadexApiClientWorker(
+    private val client: MangadexApi.Client,
+    private val logger:JTextPane,
+    private val fetchLimit: Int,
+    private val initialOffset: Int,
+    private val localePreference: Array<String>,
+    private val fileName: String,
+    private val exportOptions: EnumSet<ExportOptions>,
+    private val saveLinks: EnumSet<Links>
+): SwingWorker<Boolean, Pair<String, LogType>>(){
+    public var running: Boolean = true
+
+    override fun doInBackground(): Boolean {
+        running = true
+        val list = fetchTitles().get()
+        publish(Pair("Exporting list...\n", LogType.STANDARD))
+        exportMangaList(list, fileName, saveLinks, exportOptions)
+        return true
+    }
+
+    override fun process(chunks: List<Pair<String, LogType>?>?) {
+        logger.append("test")
+        if(chunks.isNullOrEmpty()) return
+        for(pair in chunks){
+            if(pair == null) continue
+            logger.append(pair.first,pair.second)
+        }
+    }
+
+    override fun done() {
+        running = false
+        publish(Pair("Done running", LogType.STANDARD))
+        super.done()
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    fun fetchTitles(): CompletableFuture<MutableList<SimplifiedMangaInfo>> = GlobalScope.future {
+        client.fetchTokens()
+        delay(1000)
+        var currentOffset: Int = initialOffset
+        var expectedTotal: Int = 99
+        var emptyDataReturned: Boolean = false
+        var stepCount: Int = 1  // purely statistical number... non-essential
+        var apiCalls: Int = 0 // stat
+        var mangaList: MutableList<SimplifiedMangaInfo> = mutableListOf()
+        do {
+            for (i in 1..5) {
+                publish(Pair("Current index: $currentOffset\n",LogType.STANDARD))
+                var response: HttpResponse = client.getFollowedMangaList(fetchLimit, currentOffset)
+                apiCalls++
+                if (response.status == HttpStatusCode.TooManyRequests) {
+                    publish(Pair("Reached ratelimit for API call $apiCalls. Response headers: \n" + response.headers.toString() + "\n",LogType.WARNING))
+                    try {
+                        var currentPeriodEnd: Int = (response.headers.get("RateLimit-Retry-After") ?: response.headers.get("X-RateLimit-Retry-After") ?: "60000").toInt()
+                        val waitTime = System.currentTimeMillis() - currentPeriodEnd + 1
+                        publish(Pair("Waiting $waitTime milliseconds.\n",LogType.STANDARD))
+                        delay(waitTime)
+                    } catch (e: NumberFormatException) {
+                        delay(60000)
+                        publish(Pair("Waiting 60000 milliseconds.\n",LogType.STANDARD))
+                    }
+                } else if (response.status.isSuccess()) {
+                    val responseBody = response.body<MangaInfoResponse>()
+                    emptyDataReturned = responseBody.data.isEmpty()
+                    expectedTotal = responseBody.total
+                    for(manga in responseBody.data){
+                        mangaList.add(manga.toSimplifiedMangaInfo(localePreference))
+                    }
+                    publish(Pair("Successful response ($stepCount): Received " + responseBody.data.size + " titles.\n",LogType.STANDARD))
+                    currentOffset += responseBody.data.size
+                    stepCount++
+
+                } else {
+                    publish(Pair("Unexpected HTTP Response: ${response.status}",LogType.ERROR))
+                }
+
+                if(currentOffset >= expectedTotal) {
+                    break
+                }
+            }
+
+            delay(1000)
+        } while (currentOffset <= expectedTotal && !emptyDataReturned)
+        publish(Pair("Finished fetching titles. Stats:\n\tExpected total: $expectedTotal\n\tReceived: ${mangaList.size}\n\tNumber of API calls:$apiCalls\n\tNumber of successful API calls: $stepCount",LogType.STANDARD))
+        mangaList
+    }
+
 }
 
 
@@ -594,6 +726,10 @@ fun JTextPane.append(string: String, logType: LogType = LogType.STANDARD){
         }
     }
     styledDocument.insertString(styledDocument.length, string,style)
+}
+
+fun DefaultListModel<String>.toStringArray(): Array<String> {
+    return Array<String>(this.size, {i -> "" + this[i]})
 }
 
 enum class LogType{

@@ -7,10 +7,14 @@ import java.awt.GridLayout
 import java.awt.Insets
 import java.awt.event.ActionEvent
 import javax.swing.*
+import javax.swing.border.CompoundBorder
 import javax.swing.border.EmptyBorder
+import javax.swing.border.LineBorder
 
 class ExporterUI : JFrame("Mangadex Follows Exporter") {
-    //    val button: JButton = JButton("test")
+    val windowMinWidth: Int = 600
+    val windowMinHeight: Int = 800
+
     val mainPanel = JPanel()
     var usernameField: JTextField = JTextField()
     var passwordField: JTextField = JTextField()
@@ -43,6 +47,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     val initialOffsetField: JTextField = JTextField()
     val fetchLimitField: JTextField = JTextField()
 
+    val logArea: JTextArea = JTextArea()
 
     val settings: SettingsManager = SettingsManager()
 
@@ -50,20 +55,14 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         initializeFrame()
         addMDUserCredsSection()
         addSettingsSection()
-//        panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
-//        contentPane.layout = BoxLayout(contentPane, BoxLayout.Y_AXIS)
-//        button.bounds = Rectangle(15, 50, 50, 50)
-//        button.addActionListener { println("test button clicked") }
-//        panel.add(button)
-//        add(panel, GridBagConstraints().apply {gridx = 0; gridy = 1; gridwidth = 4 })
-
+        addRunSection()
         add(mainPanel)
         isVisible = true
     }
 
     private fun initializeFrame() {
         setSize(800, 600)
-        minimumSize = Dimension(600, 800)
+        minimumSize = Dimension(windowMinWidth, windowMinHeight)
         defaultCloseOperation = EXIT_ON_CLOSE
         mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
 
@@ -100,6 +99,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         saveButton.alignmentX = CENTER_ALIGNMENT
         saveButton.alignmentY = CENTER_ALIGNMENT
         saveButton.addActionListener {
+            logArea.append("Saving MangaDex user credentials....\n")
             settings.saveMDUserCredentials(
                 mapOf(
                     SettingsManager.SecretsKeys.MD_USERNAME to usernameField.text,
@@ -108,21 +108,20 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
                     SettingsManager.SecretsKeys.MD_API_CLIENT_SECRET to apiClientSecretField.text,
                 )
             )
-            //todo put a message into the log text box
+            logArea.append("Saved.\n")
         }
 
         val loadButton = JButton("Load from File")
         loadButton.alignmentX = CENTER_ALIGNMENT
         loadButton.alignmentY = CENTER_ALIGNMENT
         loadButton.addActionListener {
+            logArea.append("Loading MangaDex user credentials....\n")
             settings.loadUserCredentials()
             usernameField.text = settings.secrets[SettingsManager.SecretsKeys.MD_USERNAME.name].toString()
             passwordField.text = settings.secrets[SettingsManager.SecretsKeys.MD_PASSWORD.name].toString()
             apiClientIdField.text = settings.secrets[SettingsManager.SecretsKeys.MD_API_CLIENT_ID.name].toString()
-            apiClientSecretField.text =
-                settings.secrets[SettingsManager.SecretsKeys.MD_API_CLIENT_SECRET.name].toString()
-            //todo put a message into the log text box
-
+            apiClientSecretField.text = settings.secrets[SettingsManager.SecretsKeys.MD_API_CLIENT_SECRET.name].toString()
+            logArea.append("Loaded.\n")
         }
 
         val filler = Box.Filler(
@@ -158,9 +157,20 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         settingsContentPanel.layout = BoxLayout(settingsContentPanel, BoxLayout.X_AXIS)
         settingsContentPanel.alignmentX = CENTER_ALIGNMENT
         settingsContentPanel.alignmentY = TOP_ALIGNMENT
+        val filler = Box.Filler(
+            Dimension(20,20),
+            Dimension(20,20),
+            Dimension(20,20)
+        )
+        filler.alignmentX = CENTER_ALIGNMENT
+        filler.alignmentY = CENTER_ALIGNMENT
+
         settingsContentPanel.add(getExportOptionsPanel())
+        settingsContentPanel.add(filler.copy())
         settingsContentPanel.add(getLinkOptionsPanel())
+        settingsContentPanel.add(filler.copy())
         settingsContentPanel.add(getLocaleOptionsPanel())
+        settingsContentPanel.add(filler.copy())
         settingsContentPanel.add(getAPIOptionsPanel())
 
         val settingsMainPanel = JPanel()
@@ -168,7 +178,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         settingsMainPanel.alignmentX = CENTER_ALIGNMENT
         settingsMainPanel.alignmentY = TOP_ALIGNMENT
         settingsMainPanel.add(settingsContentPanel)
-
+        settingsMainPanel.add(filler.copy())
         // settings save/load buttons
         val settingsSubcontentPanel = JPanel()
         settingsSubcontentPanel.layout = BoxLayout(settingsSubcontentPanel, BoxLayout.X_AXIS)
@@ -180,6 +190,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         saveButton.alignmentX = CENTER_ALIGNMENT
         saveButton.alignmentY = CENTER_ALIGNMENT
         saveButton.addActionListener {
+            logArea.append("Saving settings....\n")
             var exportSetting: String = ""
             for (exportOptionCheckbox in exportOptionCheckboxes) {
                 if (exportOptionCheckbox.isSelected)
@@ -208,52 +219,52 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
                     SettingsManager.SettingsKeys.FETCH_LIMIT to fetchLimitField.text,
                 )
             )
-            // todo log completion
+            logArea.append("Saved.\n")
         }
         settingsSubcontentPanel.add(saveButton)
-        //todo add filler
+        settingsSubcontentPanel.add(filler.copy())
         val loadButton = JButton("Load Settings")
         loadButton.alignmentX = CENTER_ALIGNMENT
         loadButton.alignmentY = CENTER_ALIGNMENT
         loadButton.addActionListener {
+            logArea.append("Loading settings....\n")
             settings.loadSettings()
             val exportOptions = settings.config.get(SettingsManager.SettingsKeys.EXPORT.name).toString().split(",")
             if (exportOptions.isNotEmpty()) {
-                exportOptionCheckboxes.forEach{it.isSelected = exportOptions.contains(it.text)}
-                if(exportOptionCheckboxes.any({ !it.isSelected })){
+                exportOptionCheckboxes.forEach { it.isSelected = exportOptions.contains(it.text) }
+                if (exportOptionCheckboxes.any({ !it.isSelected })) {
                     exportAllCheckBox.isSelected = false
 
-                } else{
+                } else {
                     exportAllCheckBox.isSelected = true
                 }
             }
 
             val linksOptions = settings.config.get(SettingsManager.SettingsKeys.LINKS.name).toString().split(",")
             if (linksOptions.isNotEmpty()) {
-                linksOptionCheckboxes.forEach{it.isSelected = linksOptions.contains(it.text)}
-                if(linksOptionCheckboxes.any({ !it.isSelected })){
+                linksOptionCheckboxes.forEach { it.isSelected = linksOptions.contains(it.text) }
+                if (linksOptionCheckboxes.any({ !it.isSelected })) {
                     linksAllCheckBox.isSelected = false
-                } else{
+                } else {
                     linksAllCheckBox.isSelected = true
                 }
             }
             val localePreferenceOption = settings.config.get(SettingsManager.SettingsKeys.LOCALE_PREFERENCE.name).toString().split(",")
             if (localePreferenceOption.isNotEmpty()) {
-                if(locales.size() > localePreferenceOption.size){
+                if (locales.size() > localePreferenceOption.size) {
                     locales.removeRange(localePreferenceOption.size, localePreferenceOption.size)
                 }
-                for(i in 0..locales.size()-1) {
+                for (i in 0..locales.size() - 1) {
                     locales[i] = localePreferenceOption[i]
                 }
-                if(locales.size() < localePreferenceOption.size) {
+                if (locales.size() < localePreferenceOption.size) {
                     locales.addAll(localePreferenceOption.subList(locales.size, localePreferenceOption.size))
                 }
             }
 
             initialOffsetField.text = settings.config.get(SettingsManager.SettingsKeys.INITIAL_OFFSET.name).toString()
             fetchLimitField.text = settings.config.get(SettingsManager.SettingsKeys.FETCH_LIMIT.name).toString()
-
-
+            logArea.append("Loaded.\n")
         }
         settingsSubcontentPanel.add(loadButton)
         mainPanel.add(settingsMainPanel)
@@ -498,9 +509,42 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         apiOptionsPanel.add(apiOptionsContentPanel)
         return apiOptionsPanel
     }
+
+    private fun addRunSection() {
+        mainPanel.add(Box.Filler(Dimension(20,20),Dimension(20,20),Dimension(20,20)))
+        val logPanel = JPanel()
+        logPanel.layout = BoxLayout(logPanel, BoxLayout.Y_AXIS)
+        logPanel.border = EmptyBorder(10, 10, 10, 10)
+        logPanel.minimumSize = Dimension(600, 400)
+        mainPanel.add(logPanel)
+
+        val runButton = JButton("Run")
+        runButton.alignmentX = CENTER_ALIGNMENT
+        runButton.maximumSize = Dimension(1200, 30)
+        runButton.addActionListener {
+            
+        }
+        logPanel.add(runButton)
+        logPanel.add(Box.Filler(Dimension(10,10),Dimension(10,10),Dimension(10,10)))
+
+
+        logArea.isEditable = false
+        logArea.border = CompoundBorder(LineBorder(Color.LIGHT_GRAY, 1), EmptyBorder(5, 5, 5, 5))
+        val scrollPane = JScrollPane(logArea)
+        scrollPane.maximumSize = Dimension(1200, 200)
+        logPanel.add(scrollPane)
+
+    }
 }
 
 
 fun <T> DefaultListModel<T>.swap(index1: Int, index2: Int) {
     set(index1, set(index2, elementAt(index1)))
+}
+
+fun Box.Filler.copy(): Box.Filler{
+    val copy = Box.Filler(this.minimumSize, this.preferredSize, this.maximumSize)
+    copy.alignmentX = this.alignmentX
+    copy.alignmentY = this.alignmentY
+    return copy
 }

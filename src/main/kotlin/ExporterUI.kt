@@ -577,12 +577,10 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             for(checkbox in exportOptionCheckboxes){
                 exportOptions.add(ExportOptions.entries.find { it.name == checkbox.text.uppercase() })
             }
-            logArea.append(exportOptions.toString())
             val saveLinks = EnumSet.noneOf(Links::class.java)
             for(checkbox in linksOptionCheckboxes){
                 saveLinks.add(Links.entries.find{it.canonicalName == checkbox.text})
             }
-            logArea.append(saveLinks.toString())
             runWorker = MangadexApiClientWorker(
                 MangadexApi.Client(usernameField.text, passwordField.text, apiClientIdField.text, apiClientSecretField.text),
                 logArea,
@@ -631,7 +629,6 @@ class MangadexApiClientWorker(
     }
 
     override fun process(chunks: List<Pair<String, LogType>?>?) {
-        logger.append("test")
         if(chunks.isNullOrEmpty()) return
         for(pair in chunks){
             if(pair == null) continue
@@ -652,7 +649,7 @@ class MangadexApiClientWorker(
         var currentOffset: Int = initialOffset
         var expectedTotal: Int = 99
         var emptyDataReturned: Boolean = false
-        var stepCount: Int = 1  // purely statistical number... non-essential
+        var stepCount: Int = 0  // purely statistical number... non-essential
         var apiCalls: Int = 0 // stat
         var mangaList: MutableList<SimplifiedMangaInfo> = mutableListOf()
         do {

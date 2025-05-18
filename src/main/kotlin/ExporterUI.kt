@@ -10,6 +10,8 @@ import javax.swing.*
 import javax.swing.border.CompoundBorder
 import javax.swing.border.EmptyBorder
 import javax.swing.border.LineBorder
+import javax.swing.text.Style
+import javax.swing.text.StyleConstants
 
 class ExporterUI : JFrame("Mangadex Follows Exporter") {
     val windowMinWidth: Int = 600
@@ -47,9 +49,14 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     val initialOffsetField: JTextField = JTextField()
     val fetchLimitField: JTextField = JTextField()
 
-    val logArea: JTextArea = JTextArea()
+    val logArea: JTextPane = object: JTextPane(){
+        override fun getScrollableTracksViewportWidth(): Boolean {
+            return true
+        }
+    }
 
     val settings: SettingsManager = SettingsManager()
+    lateinit var mdClient: MangadexApi.Client
 
     init {
         initializeFrame()
@@ -520,20 +527,42 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 
         val runButton = JButton("Run")
         runButton.alignmentX = CENTER_ALIGNMENT
-        runButton.maximumSize = Dimension(1200, 30)
+        runButton.maximumSize = Dimension(1170, 30)
         runButton.addActionListener {
-            
+            if(usernameField.text.isEmpty()) {
+                logArea.append("Username is empty.\n", LogType.ERROR)
+                return@addActionListener
+            }
+            if(passwordField.text.isEmpty()) {
+                logArea.append("Password is empty.\n", LogType.ERROR)
+                return@addActionListener
+            }
+            if(apiClientIdField.text.isEmpty()) {
+                logArea.append("API client id is empty.\n", LogType.ERROR)
+                return@addActionListener
+            }
+            if(apiClientSecretField.text.isEmpty()) {
+                logArea.append("API client secret is empty.\n", LogType.ERROR)
+                return@addActionListener
+            }
+            if(exportOptionCheckboxes.none({it.isSelected})){
+                logArea.append("No export option selected.\n", LogType.ERROR)
+                return@addActionListener
+            }
+            //todo use api client
         }
         logPanel.add(runButton)
-        logPanel.add(Box.Filler(Dimension(10,10),Dimension(10,10),Dimension(10,10)))
 
+        logPanel.add(Box.Filler(Dimension(10,10),Dimension(10,10),Dimension(10,10)))
 
         logArea.isEditable = false
         logArea.border = CompoundBorder(LineBorder(Color.LIGHT_GRAY, 1), EmptyBorder(5, 5, 5, 5))
+
         val scrollPane = JScrollPane(logArea)
         scrollPane.maximumSize = Dimension(1200, 200)
+        scrollPane.horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
+        scrollPane.border = null
         logPanel.add(scrollPane)
-
     }
 }
 
@@ -547,4 +576,28 @@ fun Box.Filler.copy(): Box.Filler{
     copy.alignmentX = this.alignmentX
     copy.alignmentY = this.alignmentY
     return copy
+}
+
+fun JTextPane.append(string: String, logType: LogType = LogType.STANDARD){
+    val style: Style?
+    when(logType){
+        LogType.STANDARD -> {
+            style = null
+        }
+        LogType.WARNING -> {
+            style = addStyle("Color Style", null)
+            StyleConstants.setForeground(style, Color.YELLOW)
+        }
+        LogType.ERROR -> {
+            style = addStyle("Color Style", null)
+            StyleConstants.setForeground(style, Color.RED)
+        }
+    }
+    styledDocument.insertString(styledDocument.length, string,style)
+}
+
+enum class LogType{
+    STANDARD,
+    WARNING,
+    ERROR,
 }

@@ -3,8 +3,8 @@ plugins {
     kotlin("plugin.serialization") version "2.1.20"
 }
 
-group = "org.example"
-version = "1.0-SNAPSHOT"
+group = "io.github.kenneth-w-chen"
+version = "1.0"
 
 repositories {
     mavenCentral()
@@ -26,4 +26,13 @@ tasks.test {
 }
 kotlin {
     jvmToolchain(21)
+}
+tasks.withType<Jar>() {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    configurations["compileClasspath"].forEach { file: File ->
+        from(zipTree(file.absoluteFile))
+    }
+    manifest{
+        attributes["Main-Class"] = "MainKt"
+    }
 }

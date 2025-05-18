@@ -2,6 +2,7 @@ import MangadexApi.Data.MangaInfoResponse
 import MangadexApi.Data.SimplifiedMangaInfo
 import Utilities.ExportOptions
 import Utilities.Links
+import Utilities.SettingsManager
 import Utilities.exportMangaList
 import io.ktor.client.call.body
 import io.ktor.client.statement.HttpResponse

@@ -1,6 +1,9 @@
+package Utilities
+
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.Properties
+import kotlin.collections.iterator
 
 class SettingsManager {
     val secrets: Properties = Properties()

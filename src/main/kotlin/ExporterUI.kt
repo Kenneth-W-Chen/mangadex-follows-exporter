@@ -4,7 +4,11 @@ import java.awt.Font
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.GridLayout
+import java.awt.Insets
+import java.awt.event.ActionEvent
 import javax.swing.*
+import javax.swing.border.CompoundBorder
+import javax.swing.border.EmptyBorder
 
 class ExporterUI : JFrame("Mangadex Follows Exporter") {
     //    val button: JButton = JButton("test")
@@ -33,7 +37,10 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         JCheckBox("Raws"),
     )
 
-    var languages: DefaultListModel<String> = DefaultListModel<String>()
+    var locales: DefaultListModel<String> = DefaultListModel<String>()
+    val initialOffsetField: JTextField = JTextField()
+    val fetchLimitField: JTextField = JTextField()
+
 
     val settings: SettingsManager = SettingsManager()
 
@@ -53,7 +60,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     }
 
     private fun initializeFrame() {
-        setSize(600, 600)
+        setSize(800, 600)
         minimumSize = Dimension(600, 800)
         defaultCloseOperation = EXIT_ON_CLOSE
         mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
@@ -149,7 +156,16 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         settingsPanel.layout = BoxLayout(settingsPanel, BoxLayout.X_AXIS)
         settingsPanel.alignmentX = CENTER_ALIGNMENT
         settingsPanel.alignmentY = TOP_ALIGNMENT
+        settingsPanel.add(getExportOptionsPanel())
+        settingsPanel.add(getLinkOptionsPanel())
+        settingsPanel.add(getLocaleOptionsPanel())
+        settingsPanel.add(getAPIOptionsPanel())
 
+
+        mainPanel.add(settingsPanel)
+    }
+
+    private fun getExportOptionsPanel(): JPanel {
         // Export options
         val exportPanel = JPanel()
         exportPanel.layout = BoxLayout(exportPanel, BoxLayout.Y_AXIS)
@@ -161,9 +177,11 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         for (checkbox in exportOptions) {
             exportPanel.add(checkbox)
         }
-        settingsPanel.add(exportPanel)
+        return exportPanel
+    }
 
-        // Links options
+    private fun getLinkOptionsPanel():JPanel {
+
         var linksPanel = JPanel()
         linksPanel.layout = BoxLayout(linksPanel, BoxLayout.Y_AXIS)
         linksPanel.alignmentY = TOP_ALIGNMENT
@@ -179,22 +197,26 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         }
         val linksScrollPane: JScrollPane = JScrollPane(linksCheckBoxPanel)
         linksScrollPane.minimumSize = Dimension(150, 130)
-        linksScrollPane.maximumSize = Dimension(150, 130)
+        linksScrollPane.maximumSize = Dimension(150, 170)
         linksScrollPane.verticalScrollBar.unitIncrement = 10
         linksScrollPane.alignmentX = LEFT_ALIGNMENT
         linksPanel.add(linksScrollPane)
-        settingsPanel.add(linksPanel)
+        return linksPanel
+    }
 
-        // Title locale options
+    private fun getLocaleOptionsPanel(): JPanel {
         var titleLocaleMainPanel = JPanel()
         titleLocaleMainPanel.layout = BoxLayout(titleLocaleMainPanel, BoxLayout.Y_AXIS)
         titleLocaleMainPanel.alignmentY = TOP_ALIGNMENT
 
+        // panel header
         var titleLabel = JLabel("Title Locale Preference")
         titleLabel.labelFor = titleLocaleMainPanel
         titleLocaleMainPanel.add(titleLabel)
+
+        // list of locales
         for (l in arrayOf("en", "ja-ro", "ja", "ko-ro", "ko", "zh-ro")) {
-            languages.addElement(l)
+            locales.addElement(l)
         }
 
         var titleLocaleContentPanel = JPanel()
@@ -203,10 +225,10 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         titleLocaleContentPanel.border = BorderFactory.createLineBorder(Color.DARK_GRAY)
         titleLocaleContentPanel.maximumSize = Dimension(140, 130)
 
-        var localeList = JList(languages)
-        localeList.selectionMode = ListSelectionModel.SINGLE_SELECTION
+        var localeJList = JList(locales)
+        localeJList.selectionMode = ListSelectionModel.SINGLE_SELECTION
 
-        var localeScrollPane: JScrollPane = JScrollPane(localeList)
+        var localeScrollPane: JScrollPane = JScrollPane(localeJList)
         localeScrollPane.minimumSize = Dimension(70, 130)
         localeScrollPane.maximumSize = Dimension(70, 130)
         localeScrollPane.verticalScrollBar.unitIncrement = 10
@@ -220,19 +242,12 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             weighty = 1.0
         })
 
+        // list interaction buttons
         var upButton = JButton("UP")
         upButton.addActionListener {
-            if(localeList.selectedIndex != 0){
-                languages.swap(localeList.selectedIndex, localeList.selectedIndex-1)
-                localeList.selectedIndex--
-            }
-        }
-
-        var downButton = JButton("DOWN")
-        downButton.addActionListener {
-            if(localeList.selectedIndex != languages.size - 1){
-                languages.swap(localeList.selectedIndex, localeList.selectedIndex+1)
-                localeList.selectedIndex++
+            if(localeJList.selectedIndex != 0){
+                locales.swap(localeJList.selectedIndex, localeJList.selectedIndex-1)
+                localeJList.selectedIndex--
             }
         }
         titleLocaleContentPanel.add(upButton, GridBagConstraints().apply {
@@ -245,6 +260,15 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             fill = GridBagConstraints.BOTH
             ipadx = 3
         })
+
+        var downButton = JButton("DOWN")
+        downButton.addActionListener {
+            if(localeJList.selectedIndex != locales.size - 1){
+                locales.swap(localeJList.selectedIndex, localeJList.selectedIndex+1)
+                localeJList.selectedIndex++
+            }
+        }
+
         titleLocaleContentPanel.add(downButton, GridBagConstraints().apply {
             gridx = 1
             gridy = 1
@@ -255,17 +279,110 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             ipadx = 3
             fill = GridBagConstraints.BOTH
         })
-
-
         titleLocaleMainPanel.add(titleLocaleContentPanel)
-        settingsPanel.add(titleLocaleMainPanel)
 
+        // isnertion panel
+        val titleLocaleSubContentPanel = JPanel()
+        titleLocaleSubContentPanel.layout = GridBagLayout()
+        titleLocaleSubContentPanel.maximumSize = Dimension(140, 40)
+        titleLocaleSubContentPanel.alignmentX = LEFT_ALIGNMENT
 
+        // insertion panel header
+        val addLabel = JLabel("Add Locale")
+        titleLocaleSubContentPanel.add(addLabel, GridBagConstraints().apply {
+            gridx = 0
+            gridy = 0
+            gridwidth = 1
+            gridheight = 1
+            fill = GridBagConstraints.NONE
+            weightx = 0.75
+            weighty = 0.5
+            anchor = GridBagConstraints.LAST_LINE_START
+        })
 
-        mainPanel.add(settingsPanel)
+        // insertion text field
+        val addLocaleField = JTextField()
+        addLocaleField.maximumSize = Dimension(140, 30)
+        addLabel.labelFor = addLocaleField
+        titleLocaleSubContentPanel.add(addLocaleField, GridBagConstraints().apply {
+            gridx = 0
+            gridy = 1
+            gridwidth = 1
+            gridheight = 1
+            fill = GridBagConstraints.HORIZONTAL
+            weightx = 0.75
+            weighty = 0.5
+            anchor = GridBagConstraints.FIRST_LINE_START
+        })
+        val insert: Action = object: AbstractAction(){
+            override fun actionPerformed(e: ActionEvent) {
+                if(addLocaleField.text.isNotEmpty() && !locales.contains(addLocaleField.text)){
+                    var index = localeJList.selectedIndex
+                    if(index < 0) {
+                        index = 0
+                    }
+                    locales.insertElementAt(addLocaleField.text, index)
+                }
+            }
+        }
+        addLocaleField.addActionListener(insert)
+
+        // insert button
+        val addLocaleButton = JButton("+")
+        addLocaleButton.addActionListener(insert)
+
+        titleLocaleSubContentPanel.add(addLocaleButton, GridBagConstraints().apply {
+            gridx = 1
+            gridy = 0
+            gridwidth = 1
+            gridheight = 2
+            fill = GridBagConstraints.BOTH
+            weightx = 0.25
+            weighty = 1.0
+            anchor = GridBagConstraints.LINE_END
+        })
+
+        titleLocaleMainPanel.add(titleLocaleSubContentPanel)
+        return titleLocaleMainPanel
     }
 
+    private fun getAPIOptionsPanel(): JPanel{
+        val apiOptionsPanel = JPanel()
+        apiOptionsPanel.layout = BoxLayout(apiOptionsPanel, BoxLayout.Y_AXIS)
+        apiOptionsPanel.alignmentX = CENTER_ALIGNMENT
+        apiOptionsPanel.alignmentY = TOP_ALIGNMENT
+        // panel header
+        val panelLabel = JLabel("API Options")
+        panelLabel.labelFor = apiOptionsPanel
+        apiOptionsPanel.add(panelLabel)
 
+        val apiOptionsContentPanel = JPanel()
+        apiOptionsContentPanel.layout = BoxLayout(apiOptionsContentPanel, BoxLayout.Y_AXIS)
+        apiOptionsContentPanel.border = EmptyBorder(0,10,0,0)
+
+        // offset setting
+        val offsetLabel = JLabel("Initial Offset")
+        offsetLabel.labelFor = initialOffsetField
+        apiOptionsContentPanel.add(offsetLabel)
+        initialOffsetField.toolTipText = "Sets the starting point for the fetching process. Setting it to 0 fetches everything."
+        initialOffsetField.maximumSize = Dimension(100, 30)
+        initialOffsetField.margin = Insets(0, 10, 0, 0)
+        initialOffsetField.alignmentX = LEFT_ALIGNMENT
+        apiOptionsContentPanel.add(initialOffsetField)
+
+        // fetch limit setting
+        val fetchLimitLabel = JLabel("Fetch Limit")
+        fetchLimitLabel.labelFor = fetchLimitField
+
+        fetchLimitField.toolTipText = "Sets a limit on how many manga are fetched per API call. Minimum is 1, and the maximum is 100."
+        fetchLimitField.maximumSize = Dimension(100, 30)
+        fetchLimitField.alignmentX = LEFT_ALIGNMENT
+        apiOptionsContentPanel.add(fetchLimitLabel)
+        apiOptionsContentPanel.add(fetchLimitField)
+
+        apiOptionsPanel.add(apiOptionsContentPanel)
+        return apiOptionsPanel
+    }
 }
 
 

@@ -3,7 +3,7 @@ plugins {
     kotlin("plugin.serialization") version "2.1.20"
 }
 
-group = "io.github.kenneth-w-chen"
+group = "io.github.kenneth-w-chen.mangadex-follows-exporter"
 version = "1.0"
 
 repositories {

@@ -1,3 +1,5 @@
+import java.io.ByteArrayOutputStream
+
 plugins {
     kotlin("jvm") version "2.1.20"
     kotlin("plugin.serialization") version "2.1.20"
@@ -5,6 +7,10 @@ plugins {
 
 group = "io.github.kenneth-w-chen.mangadex-follows-exporter"
 version = "1.0"
+val repoName = "MangaDex-Follows-Exporter"
+val jarName = "$repoName-${project.version}.jar"
+val installerTypes = arrayOf("exe")
+val mainClass = "MainKt"
 
 repositories {
     mavenCentral()
@@ -28,11 +34,54 @@ kotlin {
     jvmToolchain(21)
 }
 tasks.withType<Jar>() {
+    archiveFileName.set(jarName)
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     configurations["compileClasspath"].forEach { file: File ->
         from(zipTree(file.absoluteFile))
     }
-    manifest{
-        attributes["Main-Class"] = "MainKt"
+    manifest {
+        attributes["Main-Class"] = mainClass
     }
+}
+
+/*tasks.register("teste"){
+    println(layout.buildDirectory.dir("libs").get())
+}*/
+
+abstract class CreateInstallerTask : Exec() {
+    @get:Input
+    abstract val types: Property<Array<String>>
+
+    @get:Input
+    abstract val name: Property<String>
+
+    @TaskAction
+    fun action() {
+        mkdir("build/distributables")
+        for (type in types.get()) {
+
+        }
+    }
+}
+
+tasks.register<Exec>("createExe") {
+    group = "build"
+    description = "Builds an exe installer"
+    mkdir("build/distributables")
+    standardOutput = ByteArrayOutputStream()
+    commandLine(
+        "jpackage",
+        "--type", "exe",
+        "--app-version", version.toString(),
+        "--name", repoName,
+        "-d", layout.buildDirectory.dir("distributables").get().toString(),
+        "--input", layout.buildDirectory.dir("libs").get(),
+        "--main-jar", layout.buildDirectory.file("libs/$jarName").get().toString(),
+        "--main-class", mainClass,
+        "--win-dir-chooser"
+    )
+    doLast{
+        println(standardOutput.toString())
+    }
+    dependsOn(tasks.jar)
 }

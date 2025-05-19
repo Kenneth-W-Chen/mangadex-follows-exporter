@@ -350,7 +350,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         titleLocaleMainPanel.add(titleLabel)
 
         // list of locales
-        for (l in arrayOf("en", "ja-ro", "ja", "ko-ro", "ko", "zh-ro")) {
+        for (l in arrayOf("ja", "ja-ro", "ko", "ko-ro", "zh","zh-hk","zh-ro","en")) {
             locales.addElement(l)
         }
 
@@ -575,12 +575,16 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             }
             val exportOptions = EnumSet.noneOf(ExportOptions::class.java)
             for(checkbox in exportOptionCheckboxes){
-                exportOptions.add(ExportOptions.entries.find { it.name == checkbox.text.uppercase() })
+                if(checkbox.isSelected)
+                    exportOptions.add(ExportOptions.entries.find { it.name == checkbox.text.uppercase() })
             }
+            println(exportOptions)
             val saveLinks = EnumSet.noneOf(Links::class.java)
             for(checkbox in linksOptionCheckboxes){
-                saveLinks.add(Links.entries.find{it.canonicalName == checkbox.text})
+                if(checkbox.isSelected)
+                    saveLinks.add(Links.entries.find{it.canonicalName == checkbox.text})
             }
+            println(saveLinks)
             runWorker = MangadexApiClientWorker(
                 MangadexApi.Client(usernameField.text, passwordField.text, apiClientIdField.text, apiClientSecretField.text),
                 logArea,

@@ -3,8 +3,9 @@
 This application exports a user's MangaDex followed manga.
 
 # Requirements
-* Java 21 installed
 * An internet connection
+* A MangaDex account and [API Client](https://api.mangadex.org/docs/02-authentication/personal-clients/)
 
-# Usage
-Run the jar in the releases page
+# Installation
+* Download and run the latest executable in the releases page.
+* Alternatively, download the jar if you have Java 21+ installed.

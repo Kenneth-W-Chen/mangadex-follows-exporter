@@ -83,15 +83,18 @@ class Client(
             append("client_id", clientId)
             append("client_secret", clientSecret)
         }
-        val response: HttpResponse = httpClient.submitForm(
-            "https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token",
-            formParameters,
-            false
-        )
-
-        if (response.status == HttpStatusCode.Unauthorized) {
+        var response: HttpResponse
+        try {
+            response = httpClient.submitForm(
+                "https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token",
+                formParameters,
+                false
+            )
+        } catch(e:UninitializedPropertyAccessException) {
             throw InvalidUserCredentialsException()
-        } else if (response.status != HttpStatusCode.OK) {
+        }
+
+        if (response.status != HttpStatusCode.OK) {
             throw UnexpectedResponseException("API returned ${response.status} when trying to fetch a token.")
         }
         val body = response.body<TokenInfo>()
@@ -174,12 +177,11 @@ class Client(
      * Function to determine if a endpoint needs auth headers. Unifnished
      */
     private fun urlRequiresAuth(request: HttpRequestBuilder): Boolean {
-        if (request.url.host == "api.mangadex.org") return false
+        if (request.url.host == "auth.mangadex.org") return false
         if (request.url.pathSegments.isEmpty()) return false
         when (request.url.pathSegments[0]) {
             "user" -> return true
         }
-//        println("Path segments: ${request.url.pathSegments}")
         return false
     }
 }

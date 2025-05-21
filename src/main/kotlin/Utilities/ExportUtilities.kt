@@ -1,12 +1,14 @@
 package Utilities
 
 import MangadexApi.Data.SimplifiedMangaInfo
-import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.Path
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.EnumSet
 import kotlin.collections.forEach
 import kotlin.collections.set
+import kotlin.io.path.*
 
 enum class Links(val canonicalName: String) {
     amz("Amazon"),
@@ -38,10 +40,10 @@ enum class ExportOptions{
 
 fun exportMangaList(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String = "My_MangaDex_Follows", saveLinks: EnumSet<Links> = EnumSet.allOf(Links::class.java), exportOptions: EnumSet<ExportOptions> = EnumSet.allOf(
     ExportOptions::class.java), bufferingMode: BufferingMode=BufferingMode.PER_TITLE){
-    var fileNameEnd: String = ""
-    var titlesFile: File? = null
-    var linksFiles: Map<Links, File>? = null
-    var csvFile: File? = null
+    val homeDir: String = System.getProperty("user.home")
+    var titlesFile: Path? = null
+    var linksFiles: Map<Links, Path>? = null
+    var csvFile: Path? = null
     val makeTxt = exportOptions.contains(ExportOptions.TXT)
     val makeCsv = exportOptions.contains(ExportOptions.CSV)
     val exportMangaUpdates = exportOptions.contains(ExportOptions.MANGAUPDATES)
@@ -50,14 +52,14 @@ fun exportMangaList(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String
     if(makeCsv || makeTxt){
         val fileNameEnd: String = "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy_MM_dd_HH_mm_ss"))
         if(makeTxt){
-            titlesFile = File("${fileName}_Titles_$fileNameEnd.txt")
-            titlesFile.createNewFile()
-            linksFiles = saveLinks.associateBy({it}, { File("${fileName}_${it.name}_$fileNameEnd.txt") })
-            linksFiles.forEach { it.value.createNewFile() }
+            titlesFile = Path(homeDir, "${fileName}_$fileNameEnd.txt")
+            titlesFile.createFile()
+            linksFiles = saveLinks.associateBy({it}, { Path(homeDir, "${fileName}_${it.name}_$fileNameEnd.txt" )})
+            linksFiles.forEach { it.value.createFile() }
         }
         if(makeCsv){
-            csvFile = File("${fileName}_$fileNameEnd.csv")
-            csvFile.createNewFile()
+            csvFile = Path(homeDir, "${fileName}_$fileNameEnd.csv")
+            csvFile.createFile()
         }
     }
     fun mangaUpdatesExport(){
@@ -116,15 +118,16 @@ fun exportMangaList(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String
 
 fun writeToTextFile(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String = "My_MangaDex_Follows", saveLinks: EnumSet<Links> = EnumSet.allOf(Links::class.java), bufferingMode: BufferingMode=BufferingMode.PER_TITLE) {
     val fileNameEnd: String = "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy_MM_dd_HH_mm_ss")) + ".txt"
-    var titlesFile: File = File(fileName + "_" +"Titles" + fileNameEnd)
-    var linksFiles: Map<Links, File> = saveLinks.associateBy({it}, { File(fileName + "_" +it.name + fileNameEnd)})
+    val homeDir: String = System.getProperty("user.home")
+    var titlesFile: Path = Path(homeDir, (fileName + "_" +"Titles" + fileNameEnd))
+    var linksFiles: Map<Links, Path> = saveLinks.associateBy({it}, { Path(homeDir, (fileName + "_" +it.name + fileNameEnd))})
 
     //stats
     var titlesAdded: Int = 0
     val nullLinks: MutableMap<Links, Int> = saveLinks.associateBy({it}, {0}).toMutableMap()
 
-    titlesFile.createNewFile()
-    linksFiles.forEach { it.value.createNewFile() }
+    titlesFile.createFile()
+    linksFiles.forEach { it.value.createFile() }
     when(bufferingMode) {
         BufferingMode.PER_TITLE -> {
             for(manga in mangaList){
@@ -156,8 +159,8 @@ fun writeToTextFile(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String
         }
     }
 
-    var statsFile = File(fileName + "_stats" + fileNameEnd)
-    statsFile.createNewFile()
+    var statsFile = Path(homeDir, (fileName + "_stats" + fileNameEnd))
+    statsFile.createFile()
     statsFile.writeText("Titles added: $titlesAdded\nNull links count:\n")
     for(link in saveLinks){
         statsFile.appendText("\t" + link.name + ":\t" + nullLinks[link]!!.toString())

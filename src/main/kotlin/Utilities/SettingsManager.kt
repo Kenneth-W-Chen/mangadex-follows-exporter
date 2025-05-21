@@ -4,6 +4,9 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.Properties
 import kotlin.collections.iterator
+import kotlin.io.path.Path
+import kotlin.io.path.inputStream
+import kotlin.io.path.outputStream
 
 class SettingsManager {
     val secrets: Properties = Properties()
@@ -17,14 +20,14 @@ class SettingsManager {
         for ((key, value) in credentials) {
             secrets.setProperty(key.name, value)
         }
-        FileOutputStream("secrets.properties", false).use { s ->
-            secrets.store(s, null)
+        Path(System.getProperty("user.home"), "md_exporter_secrets.properties").outputStream().use{
+            secrets.store(it, null)
         }
     }
 
     fun loadUserCredentials() {
-        FileInputStream("secrets.properties").use { s ->
-            secrets.load(s)
+        Path(System.getProperty("user.home"), "md_exporter_secrets.properties").inputStream().use{
+            secrets.load(it)
         }
     }
 
@@ -32,14 +35,14 @@ class SettingsManager {
         for((key, value) in settings) {
             config.setProperty(key.name, value)
         }
-        FileOutputStream("config.properties", false).use { s ->
-            config.store(s, null)
+        Path(System.getProperty("user.home"), "md_exporter_config.properties").outputStream().use{
+            config.store(it, null)
         }
     }
 
     fun loadSettings() {
-        FileInputStream("config.properties").use { s ->
-            config.load(s)
+        Path(System.getProperty("user.home"), "md_exporter_config.properties").inputStream().use{
+            config.load(it)
         }
     }
 

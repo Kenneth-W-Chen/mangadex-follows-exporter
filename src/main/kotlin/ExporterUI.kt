@@ -626,9 +626,22 @@ class MangadexApiClientWorker(
 
     override fun doInBackground(): Boolean {
         running = true
-        val list = fetchTitles().get()
+        var list: MutableList<SimplifiedMangaInfo> = mutableListOf()
+        publish(Pair("Starting title fetch...\n", LogType.STANDARD))
+        try {
+            list = fetchTitles().get()
+        } catch(e: Exception){
+            publish(Pair(e.toString() + "\n", LogType.ERROR))
+            if(e is MangadexApi.Exceptions.InvalidUserCredentialsException){
+              return false
+            }
+        }
         publish(Pair("Exporting list...\n", LogType.STANDARD))
-        exportMangaList(list, fileName, saveLinks, exportOptions)
+        try {
+            exportMangaList(list, fileName, saveLinks, exportOptions)
+        } catch(e: Exception){
+            publish(Pair(e.toString() + "\n",LogType.ERROR))
+        }
         return true
     }
 
@@ -642,7 +655,7 @@ class MangadexApiClientWorker(
 
     override fun done() {
         running = false
-        publish(Pair("Done running", LogType.STANDARD))
+        publish(Pair("Done running\n", LogType.STANDARD))
         super.done()
     }
 

@@ -116,7 +116,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         saveButton.alignmentY = CENTER_ALIGNMENT
         saveButton.addActionListener {
             logArea.append("Saving MangaDex user credentials....\n")
-            settings.saveMDUserCredentials(
+            settings.saveUserCredentials(
                 mapOf(
                     SettingsManager.SecretsKeys.MD_USERNAME to mdUsernameField.text,
                     SettingsManager.SecretsKeys.MD_PASSWORD to mdPasswordField.text,
@@ -567,9 +567,49 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 
         muSettingsPanel.add(getFieldLayoutPanel("Username",muUsernameField))
         muSettingsPanel.add(getFieldLayoutPanel("Password",muPasswordField))
-        
 
+        val saveLoadPanel = JPanel()
+        saveLoadPanel.layout = BoxLayout(saveLoadPanel, BoxLayout.X_AXIS)
+        saveLoadPanel.alignmentY = CENTER_ALIGNMENT
+        saveLoadPanel.alignmentX = CENTER_ALIGNMENT
+
+        val saveButton = JButton("Save to File")
+        saveButton.alignmentX = CENTER_ALIGNMENT
+        saveButton.alignmentY = CENTER_ALIGNMENT
+        saveButton.addActionListener {
+            logArea.append("Saving MangaUpdates user credentials....\n")
+            settings.saveUserCredentials(
+                mapOf(
+                    SettingsManager.SecretsKeys.MU_USERNAME to muUsernameField.text,
+                    SettingsManager.SecretsKeys.MU_PASSWORD to muPasswordField.text,
+                )
+            )
+            logArea.append("Saved.\n")
+        }
+
+        val loadButton = JButton("Load from File")
+        loadButton.alignmentX = CENTER_ALIGNMENT
+        loadButton.alignmentY = CENTER_ALIGNMENT
+        loadButton.addActionListener {
+            logArea.append("Loading MangaUpdates user credentials....\n")
+            settings.loadUserCredentials()
+            muUsernameField.text = settings.secrets[SettingsManager.SecretsKeys.MU_USERNAME.name].toString()
+            muPasswordField.text = settings.secrets[SettingsManager.SecretsKeys.MU_PASSWORD.name].toString()
+            logArea.append("Loaded.\n")
+        }
+
+        val filler = Box.Filler(
+            Dimension(20, 100),
+            Dimension(50, 100),
+            Dimension(100, 100)
+        )
+        filler.alignmentX = CENTER_ALIGNMENT
+        filler.alignmentY = CENTER_ALIGNMENT
+        saveLoadPanel.add(saveButton)
+        saveLoadPanel.add(filler)
+        saveLoadPanel.add(loadButton)
         mainPanel.add(muSettingsPanel)
+        mainPanel.add(saveLoadPanel)
 
 
     }

@@ -1,7 +1,5 @@
 package Utilities
 
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.util.Properties
 import kotlin.collections.iterator
 import kotlin.io.path.Path
@@ -16,7 +14,8 @@ class SettingsManager {
             config.load(FileInputStream("config.properties"))
         }*/
 
-    fun saveMDUserCredentials(credentials: Map<SecretsKeys, String>) {
+    fun saveUserCredentials(credentials: Map<SecretsKeys, String>) {
+        loadUserCredentials()
         for ((key, value) in credentials) {
             secrets.setProperty(key.name, value)
         }
@@ -51,6 +50,8 @@ class SettingsManager {
         MD_PASSWORD,
         MD_API_CLIENT_ID,
         MD_API_CLIENT_SECRET,
+        MU_USERNAME,
+        MU_PASSWORD
     }
 
     enum class SettingsKeys{

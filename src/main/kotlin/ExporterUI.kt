@@ -606,6 +606,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 
         val scrollPane = JScrollPane(logArea)
         scrollPane.maximumSize = Dimension(1200, 200)
+        scrollPane.preferredSize = Dimension(1200, 200)
+        scrollPane.minimumSize = Dimension(1200, 200)
         scrollPane.horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
         scrollPane.border = null
         logPanel.add(scrollPane)

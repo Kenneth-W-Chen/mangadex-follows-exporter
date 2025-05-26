@@ -28,6 +28,7 @@ import javax.swing.border.EmptyBorder
 import javax.swing.border.LineBorder
 import javax.swing.text.Style
 import javax.swing.text.StyleConstants
+import kotlin.math.min
 import kotlin.text.toInt
 
 class ExporterUI : JFrame("Mangadex Follows Exporter") {
@@ -372,7 +373,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             gridx = 0
             gridy = 0
             gridwidth = 1
-            gridheight = 2
+            gridheight = 3
             weightx = 0.5
             weighty = 1.0
         })
@@ -391,11 +392,33 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             gridwidth = 1
             gridheight = 1
             weightx = 0.5
-            weighty = 0.5
+            weighty = 0.3
             fill = GridBagConstraints.BOTH
             ipadx = 3
         })
 
+        val deleteBUtton = JButton("DEL")
+        deleteBUtton.addActionListener {
+            val curIndex: Int = localeJList.selectedIndex
+            if (curIndex >= 0) {
+                locales.remove(curIndex)
+                if(locales.size > 0) {
+                    localeJList.selectedIndex = min(curIndex, locales.size - 1)
+                }
+            }
+        }
+
+        titleLocaleContentPanel.add(deleteBUtton, GridBagConstraints().apply {
+            gridx = 1
+            gridy = 1
+            gridwidth = 1
+            gridheight = 1
+            weightx = 0.5
+            weighty = 0.3
+            ipadx = 3
+            fill = GridBagConstraints.BOTH
+        })
+        titleLocaleMainPanel.add(titleLocaleContentPanel)
         val downButton = JButton("DOWN")
         downButton.addActionListener {
             if (localeJList.selectedIndex != locales.size - 1 && localeJList.selectedIndex >= 0) {
@@ -406,11 +429,11 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 
         titleLocaleContentPanel.add(downButton, GridBagConstraints().apply {
             gridx = 1
-            gridy = 1
+            gridy = 2
             gridwidth = 1
             gridheight = 1
             weightx = 0.5
-            weighty = 0.5
+            weighty = 0.3
             ipadx = 3
             fill = GridBagConstraints.BOTH
         })

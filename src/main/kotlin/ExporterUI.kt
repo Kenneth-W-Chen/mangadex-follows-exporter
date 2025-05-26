@@ -657,7 +657,7 @@ class MangadexApiClientWorker(
             list = fetchTitles().get()
         } catch(e: Exception){
             publish(Pair(e.toString() + "\n", LogType.ERROR))
-            if(e is MangadexApi.Exceptions.InvalidUserCredentialsException){
+            if(e is MangadexApi.Exceptions.InvalidMDUserCredentialsException){
               return false
             }
         }

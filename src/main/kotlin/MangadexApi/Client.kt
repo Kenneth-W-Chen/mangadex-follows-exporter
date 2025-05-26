@@ -1,11 +1,9 @@
 package MangadexApi
 
-import LogType
 import MangadexApi.Data.MangaInfoResponse
 import MangadexApi.Data.SimplifiedMangaInfo
 import MangadexApi.Exceptions.*
 import MangadexApi.Data.TokenInfo
-import append
 
 import io.ktor.client.*
 import io.ktor.client.call.body
@@ -60,7 +58,7 @@ class Client(
                         false
                     ) { markAsRefreshTokenRequest() }
                     if (response.status != HttpStatusCode.OK) {
-                        throw UnexpectedResponseException("API returned ${response.status} when trying to fetch a token. Body:\n${response.body<String>()}")
+                        throw UnexpectedMDApiResponseException("API returned ${response.status} when trying to fetch a token. Body:\n${response.body<String>()}")
                     }
                     val body = response.body<TokenInfo>()
                     BearerTokens(body.accessToken, body.refreshToken)
@@ -91,11 +89,11 @@ class Client(
                 false
             )
         } catch(e:UninitializedPropertyAccessException) {
-            throw InvalidUserCredentialsException()
+            throw InvalidMDUserCredentialsException()
         }
 
         if (response.status != HttpStatusCode.OK) {
-            throw UnexpectedResponseException("API returned ${response.status} when trying to fetch a token.")
+            throw UnexpectedMDApiResponseException("API returned ${response.status} when trying to fetch a token.")
         }
         val body = response.body<TokenInfo>()
         accessToken = body.accessToken

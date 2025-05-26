@@ -1,4 +1,4 @@
 package MangadexApi.Exceptions
 
-class InvalidUserCredentialsException: Exception("Invalid user or client credentials.")
-class UnexpectedResponseException(message: String): Exception(message)
+class InvalidMDUserCredentialsException: Exception("Invalid user or client credentials.")
+class UnexpectedMDApiResponseException(message: String): Exception(message)

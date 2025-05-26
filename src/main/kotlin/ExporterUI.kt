@@ -33,11 +33,11 @@ import kotlin.text.toInt
 
 class ExporterUI : JFrame("Mangadex Follows Exporter") {
     val windowMinWidth: Int = 600
-    val windowMinHeight: Int = 800
+    val windowMinHeight: Int = 1000
 
     val mainPanel = JPanel()
-    var usernameField: JTextField = JTextField()
-    var passwordField: JTextField = JTextField()
+    var mdUsernameField: JTextField = JTextField()
+    var mdPasswordField: JTextField = JTextField()
     var apiClientIdField: JTextField = JTextField()
     var apiClientSecretField: JTextField = JTextField()
     var exportOptionCheckboxes: Array<JCheckBox> = arrayOf(
@@ -54,6 +54,9 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     val initialOffsetField: JTextField = JTextField()
     val fetchLimitField: JTextField = JTextField()
 
+    var muUsernameField: JTextField = JTextField()
+    var muPasswordField: JTextField = JTextField()
+
     val logArea: JTextPane = object: JTextPane(){
         override fun getScrollableTracksViewportWidth(): Boolean {
             return true
@@ -66,7 +69,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     init {
         initializeFrame()
         addMDUserCredsSection()
-        addSettingsSection()
+        addMDSettingSections()
+        addMUSettingsSection()
         addRunSection()
         add(mainPanel)
         isVisible = true
@@ -92,8 +96,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         mainPanel.add(userCredsHeader)
 
         // Text Fields
-        userCredsPanel.add(getFieldLayoutPanel("Username", usernameField))
-        userCredsPanel.add(getFieldLayoutPanel("Password", passwordField))
+        userCredsPanel.add(getFieldLayoutPanel("Username", mdUsernameField))
+        userCredsPanel.add(getFieldLayoutPanel("Password", mdPasswordField))
         userCredsPanel.add(getFieldLayoutPanel("API Client ID", apiClientIdField))
         userCredsPanel.add(getFieldLayoutPanel("API Client Secret", apiClientSecretField))
         userCredsPanel.maximumSize = Dimension(400, 100)
@@ -114,8 +118,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             logArea.append("Saving MangaDex user credentials....\n")
             settings.saveMDUserCredentials(
                 mapOf(
-                    SettingsManager.SecretsKeys.MD_USERNAME to usernameField.text,
-                    SettingsManager.SecretsKeys.MD_PASSWORD to passwordField.text,
+                    SettingsManager.SecretsKeys.MD_USERNAME to mdUsernameField.text,
+                    SettingsManager.SecretsKeys.MD_PASSWORD to mdPasswordField.text,
                     SettingsManager.SecretsKeys.MD_API_CLIENT_ID to apiClientIdField.text,
                     SettingsManager.SecretsKeys.MD_API_CLIENT_SECRET to apiClientSecretField.text,
                 )
@@ -129,8 +133,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         loadButton.addActionListener {
             logArea.append("Loading MangaDex user credentials....\n")
             settings.loadUserCredentials()
-            usernameField.text = settings.secrets[SettingsManager.SecretsKeys.MD_USERNAME.name].toString()
-            passwordField.text = settings.secrets[SettingsManager.SecretsKeys.MD_PASSWORD.name].toString()
+            mdUsernameField.text = settings.secrets[SettingsManager.SecretsKeys.MD_USERNAME.name].toString()
+            mdPasswordField.text = settings.secrets[SettingsManager.SecretsKeys.MD_PASSWORD.name].toString()
             apiClientIdField.text = settings.secrets[SettingsManager.SecretsKeys.MD_API_CLIENT_ID.name].toString()
             apiClientSecretField.text = settings.secrets[SettingsManager.SecretsKeys.MD_API_CLIENT_SECRET.name].toString()
             logArea.append("Loaded.\n")
@@ -164,8 +168,13 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         return layoutPanel
     }
 
-    private fun addSettingsSection() {
+    private fun addMDSettingSections() {
         val settingsContentPanel = JPanel()
+        val mdSettingsHeader = JLabel("MangaDex Export Settings")
+        mdSettingsHeader.labelFor = settingsContentPanel
+        mdSettingsHeader.font = Font("Sans Serif", Font.BOLD, 20)
+        mdSettingsHeader.alignmentX = CENTER_ALIGNMENT
+        mainPanel.add(mdSettingsHeader)
         settingsContentPanel.layout = BoxLayout(settingsContentPanel, BoxLayout.X_AXIS)
         settingsContentPanel.alignmentX = CENTER_ALIGNMENT
         settingsContentPanel.alignmentY = TOP_ALIGNMENT
@@ -544,6 +553,27 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         return apiOptionsPanel
     }
 
+    private fun addMUSettingsSection(){
+        mainPanel.add(Box.Filler(Dimension(20,20),Dimension(20,20),Dimension(20,20)))
+        val muSettingsHeader = JLabel("MangaUpdates Import Settings")
+        val muSettingsPanel = JPanel()
+        muSettingsHeader.labelFor = muSettingsPanel
+        muSettingsHeader.font = Font("Sans Serif", Font.BOLD, 16)
+        muSettingsHeader.alignmentX = CENTER_ALIGNMENT
+        mainPanel.add(muSettingsHeader)
+
+        muSettingsPanel.layout = GridLayout(1,2,20,0)
+        muSettingsPanel.maximumSize = Dimension(400, 50)
+
+        muSettingsPanel.add(getFieldLayoutPanel("Username",muUsernameField))
+        muSettingsPanel.add(getFieldLayoutPanel("Password",muPasswordField))
+        
+
+        mainPanel.add(muSettingsPanel)
+
+
+    }
+
     private fun addRunSection() {
         mainPanel.add(Box.Filler(Dimension(20,20),Dimension(20,20),Dimension(20,20)))
         val logPanel = JPanel()
@@ -560,11 +590,11 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
                 logArea.append("Already running.\n", LogType.WARNING)
                 return@addActionListener
             }
-            if(usernameField.text.isEmpty()) {
+            if(mdUsernameField.text.isEmpty()) {
                 logArea.append("Username is empty.\n", LogType.ERROR)
                 return@addActionListener
             }
-            if(passwordField.text.isEmpty()) {
+            if(mdPasswordField.text.isEmpty()) {
                 logArea.append("Password is empty.\n", LogType.ERROR)
                 return@addActionListener
             }
@@ -609,7 +639,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             }
             println(saveLinks)
             runWorker = MangadexApiClientWorker(
-                MangadexApi.Client(usernameField.text, passwordField.text, apiClientIdField.text, apiClientSecretField.text),
+                MangadexApi.Client(mdUsernameField.text, mdPasswordField.text, apiClientIdField.text, apiClientSecretField.text),
                 logArea,
                 fetchLimit,
                 initialOffset,

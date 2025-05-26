@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "io.github.kenneth-w-chen.mangadex-follows-exporter"
-version = "1.1"
+version = "1.1.2"
 val repoName = "MangaDex-Follows-Exporter"
 val jarName = "$repoName-${project.version}.jar"
 val installerTypes = arrayOf("exe")

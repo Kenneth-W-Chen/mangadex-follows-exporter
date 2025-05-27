@@ -2,7 +2,9 @@ package MangaUpdatesAPI
 
 import MangaUpdatesAPI.Exceptions.InvalidMUCredentialsException
 import MangaUpdatesAPI.Exceptions.UnexpectedMUApiResponseException
+import MangaUpdatesAPI.ResponseClasses.CreateCustomListResponse
 import MangaUpdatesAPI.ResponseClasses.ListData
+import MangaUpdatesAPI.ResponseClasses.ListType
 import MangaUpdatesAPI.ResponseClasses.LoginResponseData
 import io.ktor.client.*
 import io.ktor.client.call.body
@@ -14,7 +16,13 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.delay
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.put
 
 class Client(private val username: String, private val password: String) {
     private val apiVersion = "v1"
@@ -49,7 +57,7 @@ class Client(private val username: String, private val password: String) {
         return response.body<List<ListData>>()
     }
 
-    suspend fun addTitlesToListById(seriesIds: Array<String>, listId: Int) {
+    suspend fun addTitlesToListById(seriesIds: MutableList<String>, listId: String): HttpResponse {
         var body: String = "["
         for(seriesId in seriesIds){
             body += "{" +
@@ -87,18 +95,23 @@ class Client(private val username: String, private val password: String) {
         if(!response.status.isSuccess()){
             throw UnexpectedMUApiResponseException("Unexpected response from server when adding series - ${response.status}: ${response.body<JsonObject>()["reason"]}. Full response: ${response.body<JsonObject>()}")
         }
+        return response
     }
 
-    suspend fun addTitlesToListByTitle(titles: Array<String>, listId: Int) {
-        var body: String = "["
-        for(title in titles){
-            body += "{ \"series_title\": \"${title.replace("\"","\\\"")} },"
+    suspend fun addTitlesToListByTitle(titles: List<String>, listId: String): HttpResponse {
+        val body: JsonArray = buildJsonArray {
+            for(title in titles){
+                add(buildJsonObject {
+                    put("priority", "High")
+                    put("series_title", title)
+                })
+            }
         }
-        body = body.removeSuffix(",") + "]"
+
         val url: Url = buildUrl {
             protocol = URLProtocol.HTTPS
             host = "api.mangaupdates.com"
-            path(apiVersion, "lists", listId.toString(), "series", "bulk")
+            path(apiVersion, "lists", listId, "series", "bulk")
         }
         var response: HttpResponse = client.post(url){
             contentType(ContentType.Application.Json)
@@ -111,13 +124,15 @@ class Client(private val username: String, private val password: String) {
                 setBody(body)
             }
         }
+
         if(!response.status.isSuccess()){
             throw UnexpectedMUApiResponseException("Unexpected response from server when adding series - ${response.status}: ${response.body<JsonObject>()["reason"]}. Full response: ${response.body<JsonObject>()}")
         }
+        return response
     }
 
     suspend fun getTitleId(pageId: String): String{
-        val response = client.get{
+        var response = client.get{
             url{
                 protocol = URLProtocol.HTTPS
                 host = "www.mangaupdates.com"
@@ -125,10 +140,50 @@ class Client(private val username: String, private val password: String) {
                 parameter("id", pageId)
             }
         }
+        while(response.status == HttpStatusCode.PreconditionFailed){
+            delay(5000)
+            response = client.get{
+                url{
+                    protocol = URLProtocol.HTTPS
+                    host = "www.mangaupdates.com"
+                    path("series.html")
+                    parameter("id", pageId)
+                }
+            }
+        }
+
         if(!response.status.isSuccess()){
             throw UnexpectedMUApiResponseException("Unexpected response from server when fetching title ID by title: ${response.status}: ${response.body<String>()}")
         }
         return Regex("href=\"https:\\/\\/api.mangaupdates.com\\/v1\\/series\\/([0-9]+)\\/rss\">").find(response.body<String>())!!.groupValues[1]
+    }
+
+    suspend fun makeList(title: String, description: String, type: ListType): String{
+       val url = buildUrl{
+            protocol = URLProtocol.HTTPS
+            host = "api.mangaupdates.com"
+            path(apiVersion, "lists")
+        }
+        val body = buildJsonObject{
+            put("title", title)
+            put("description", description)
+            put("type", Json.encodeToJsonElement(type))
+        }
+        var response = client.post(url){
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+        while(response.status == HttpStatusCode.PreconditionFailed){
+            delay(5000)
+            response = client.post(url){
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+        }
+        if(!response.status.isSuccess()){
+            throw UnexpectedMUApiResponseException("Unexpected response from server when making a new reading list: ${response.status}: ${response.body<String>()}")
+        }
+        return response.body<CreateCustomListResponse>().context.id
     }
 
     private suspend fun fetchToken(): BearerTokens {

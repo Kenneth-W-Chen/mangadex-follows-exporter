@@ -1,5 +1,6 @@
 import MangadexApi.Data.MangaInfoResponse
 import MangadexApi.Data.SimplifiedMangaInfo
+import Utilities.BufferingMode
 import Utilities.ExportOptions
 import Utilities.Links
 import Utilities.SettingsManager
@@ -631,11 +632,11 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
                 return@addActionListener
             }
             if(mdUsernameField.text.isEmpty()) {
-                logArea.append("Username is empty.\n", LogType.ERROR)
+                logArea.append("MangaDex username is empty.\n", LogType.ERROR)
                 return@addActionListener
             }
             if(mdPasswordField.text.isEmpty()) {
-                logArea.append("Password is empty.\n", LogType.ERROR)
+                logArea.append("MangaDex password is empty.\n", LogType.ERROR)
                 return@addActionListener
             }
             if(apiClientIdField.text.isEmpty()) {
@@ -649,6 +650,18 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
             if(exportOptionCheckboxes.none({it.isSelected})){
                 logArea.append("No export option selected.\n", LogType.ERROR)
                 return@addActionListener
+            }
+            var muClient: MangaUpdatesAPI.Client? = null
+            if(exportOptionCheckboxes[2].isSelected) {
+                if(muUsernameField.text.isEmpty() ){
+                    logArea.append("MangaUpdates username is empty but MangaUpdates was set as an export option.\n",LogType.ERROR)
+                    return@addActionListener
+                }
+                if(muPasswordField.text.isEmpty()){
+                    logArea.append("MangaUpdates password is empty but MangaUpdates was set as an export option.\n",LogType.ERROR)
+                    return@addActionListener
+                }
+                muClient = MangaUpdatesAPI.Client(muUsernameField.text, muPasswordField.text)
             }
             var fetchLimit = fetchLimitField.text.toIntOrNull()
             if(fetchLimit == null){
@@ -671,13 +684,13 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
                 if(checkbox.isSelected)
                     exportOptions.add(ExportOptions.entries.find { it.name == checkbox.text.uppercase() })
             }
-            println(exportOptions)
             val saveLinks = EnumSet.noneOf(Links::class.java)
             for(checkbox in linksOptionCheckboxes){
                 if(checkbox.isSelected)
                     saveLinks.add(Links.entries.find{it.canonicalName == checkbox.text})
             }
-            println(saveLinks)
+
+
             runWorker = MangadexApiClientWorker(
                 MangadexApi.Client(mdUsernameField.text, mdPasswordField.text, apiClientIdField.text, apiClientSecretField.text),
                 logArea,
@@ -686,7 +699,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
                 locales.toStringArray(),
                 "My_MangaDex_Follows",
                 exportOptions,
-                saveLinks
+                saveLinks,
+                muClient
             )
             runWorker.execute()
         }
@@ -696,7 +710,6 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 
         logArea.isEditable = false
         logArea.border = CompoundBorder(LineBorder(Color.LIGHT_GRAY, 1), EmptyBorder(5, 5, 5, 5))
-
         val scrollPane = JScrollPane(logArea)
         scrollPane.maximumSize = Dimension(1200, 200)
         scrollPane.preferredSize = Dimension(1200, 200)
@@ -715,7 +728,8 @@ class MangadexApiClientWorker(
     private val localePreference: Array<String>,
     private val fileName: String,
     private val exportOptions: EnumSet<ExportOptions>,
-    private val saveLinks: EnumSet<Links>
+    private val saveLinks: EnumSet<Links>,
+    private val muClient: MangaUpdatesAPI.Client? = null
 ): SwingWorker<Boolean, Pair<String, LogType>>(){
     public var running: Boolean = true
 
@@ -731,9 +745,9 @@ class MangadexApiClientWorker(
               return false
             }
         }
-        publish(Pair("Exporting list...\n", LogType.STANDARD))
+        publish(Pair("\nExporting list... (This may take a few minutes if you selected MangaUpdates as an export option)\n", LogType.STANDARD))
         try {
-            exportMangaList(list, fileName, saveLinks, exportOptions)
+            wrapper(list).get()
         } catch(e: Exception){
             publish(Pair(e.toString() + "\n",LogType.ERROR))
         }
@@ -755,6 +769,11 @@ class MangadexApiClientWorker(
     }
 
     @OptIn(DelicateCoroutinesApi::class)
+    fun wrapper(list: MutableList<SimplifiedMangaInfo>) = GlobalScope.future{
+        exportMangaList(list, fileName, saveLinks, exportOptions, BufferingMode.PER_TITLE,muClient, ::publish)
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
     fun fetchTitles(): CompletableFuture<MutableList<SimplifiedMangaInfo>> = GlobalScope.future {
         client.fetchTokens()
         delay(1000)
@@ -763,7 +782,7 @@ class MangadexApiClientWorker(
         var emptyDataReturned: Boolean = false
         var stepCount: Int = 0  // purely statistical number... non-essential
         var apiCalls: Int = 0 // stat
-        var mangaList: MutableList<SimplifiedMangaInfo> = mutableListOf()
+        val mangaList: MutableList<SimplifiedMangaInfo> = mutableListOf()
         do {
             for (i in 1..5) {
                 publish(Pair("Current index: $currentOffset\n",LogType.STANDARD))
@@ -808,7 +827,6 @@ class MangadexApiClientWorker(
 
 }
 
-
 fun <T> DefaultListModel<T>.swap(index1: Int, index2: Int) {
     set(index1, set(index2, elementAt(index1)))
 }
@@ -828,7 +846,7 @@ fun JTextPane.append(string: String, logType: LogType = LogType.STANDARD){
         }
         LogType.WARNING -> {
             style = addStyle("Color Style", null)
-            StyleConstants.setForeground(style, Color.YELLOW)
+            StyleConstants.setForeground(style, Color(216,173,0))
         }
         LogType.ERROR -> {
             style = addStyle("Color Style", null)

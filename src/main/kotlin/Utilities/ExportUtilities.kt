@@ -1,14 +1,22 @@
 package Utilities
 
+import LogType
+import MangaUpdatesAPI.Client
+import MangaUpdatesAPI.ResponseClasses.BulkTitleAddResponse
+import MangaUpdatesAPI.ResponseClasses.ListType
 import MangadexApi.Data.SimplifiedMangaInfo
+import io.ktor.client.call.body
+import kotlinx.coroutines.delay
 import java.nio.file.Path
 import kotlin.io.path.Path
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.EnumSet
+import java.util.function.Consumer
 import kotlin.collections.forEach
 import kotlin.collections.set
 import kotlin.io.path.*
+import kotlin.math.min
 
 enum class Links(val canonicalName: String) {
     amz("Amazon"),
@@ -38,8 +46,17 @@ enum class ExportOptions{
     MANGAUPDATES
 }
 
-fun exportMangaList(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String = "My_MangaDex_Follows", saveLinks: EnumSet<Links> = EnumSet.allOf(Links::class.java), exportOptions: EnumSet<ExportOptions> = EnumSet.allOf(
-    ExportOptions::class.java), bufferingMode: BufferingMode=BufferingMode.PER_TITLE){
+suspend fun exportMangaList(
+    mangaList: MutableList<SimplifiedMangaInfo>,
+    fileName: String = "My_MangaDex_Follows",
+    saveLinks: EnumSet<Links> = EnumSet.allOf(Links::class.java),
+    exportOptions: EnumSet<ExportOptions> = EnumSet.allOf(
+        ExportOptions::class.java
+    ),
+    bufferingMode: BufferingMode = BufferingMode.PER_TITLE,
+    muClient: Client? = null,
+    publish: ((Pair<String, LogType>)->Unit)? = null
+){
     val homeDir: String = System.getProperty("user.home")
     var titlesFile: Path? = null
     var linksFiles: Map<Links, Path>? = null
@@ -62,9 +79,34 @@ fun exportMangaList(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String
             csvFile.createFile()
         }
     }
-    fun mangaUpdatesExport(){
-        //todo
+
+    suspend fun mangaUpdatesExportByID(){
+        val readingLists = muClient!!.fetchLists()
+        val mdList = readingLists.firstOrNull { it.title == "MangaDex Reading List" }
+        var readingListId: String = ""
+        if(mdList!=null){
+            readingListId = mdList.listId
+        } else{
+            readingListId = muClient.makeList("MangaDex Reading List", "List of follows exported from MangaDex", ListType.READ)
+        }
+        val titleIds: MutableList<String> = mutableListOf()
+        for(manga in mangaList){
+            if(manga.links == null || manga.links["mu"] == null) continue
+            delay(5000)
+            titleIds.add(muClient.getTitleId(manga.links["mu"].toString()))
+        }
+        publish?.invoke(Pair("Beginning MangaUpdates export...\n", LogType.STANDARD))
+        for(i in 0..titleIds.size - 1 step 100){
+            val toIndex = min(i + 100, titleIds.size - 1)
+            publish?.invoke(Pair("Exporting titles $i to ${toIndex-1}\n", LogType.STANDARD))
+            val response = muClient.addTitlesToListById(titleIds.subList(i, toIndex), readingListId)
+            publish?.invoke(Pair("Finished with response: ${response.body<String>()}\n", LogType.STANDARD))
+            println(response.body<String>())
+            delay(5000)
+        }
     }
+
+
     when(bufferingMode){
         BufferingMode.PER_TITLE -> {
             if(makeCsv) csvFile!!.appendText("title,${saveLinks.joinToString(",", transform = { it.name })}\n")
@@ -72,7 +114,6 @@ fun exportMangaList(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String
                 if(makeTxt) titlesFile!!.appendText(manga.title + "\n")
                 var csvLine = ""
                 if(makeCsv) csvLine += "${manga.title},"
-                if(exportMangaUpdates) mangaUpdatesExport()
                 for(link in saveLinks){
                     val _link = manga.links?.get(link.name)
                     if(_link == null) nullLinks[link] = nullLinks[link]!!.plus(1)
@@ -94,7 +135,6 @@ fun exportMangaList(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String
             for(manga in mangaList){
                 if(makeTxt) titles+=manga.title + "\n"
                 if(makeCsv) csvLines += "${manga.title},"
-                if(exportMangaUpdates) mangaUpdatesExport()
                 for(link in saveLinks){
                     val _link = manga.links?.get(link.name)
                     if(_link == null) nullLinks[link] = nullLinks[link]!!.plus(1)
@@ -112,6 +152,38 @@ fun exportMangaList(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String
                 }
             }
             if(makeCsv) csvFile!!.appendText(csvLines)
+        }
+    }
+    if(exportMangaUpdates) {
+        val readingLists = muClient!!.fetchLists()
+        val mdList = readingLists.firstOrNull { it.title == "MangaDex Reading List" }
+        var readingListId: String = ""
+        if(mdList!=null){
+            readingListId = mdList.listId
+        } else{
+            readingListId = muClient.makeList("MangaDex Reading List", "List of follows exported from MangaDex", ListType.READ)
+        }
+        val titles: List<String> = mangaList.map { mangaInfo -> mangaInfo.title.trim({it == '\''||it=='"'||it=='\n'||it=='\r'||it==' '}) }
+        publish?.invoke(Pair("Beginning MangaUpdates export...\n", LogType.STANDARD))
+        for(i in 0..titles.size - 1 step 100){
+            val toIndex = min(i + 100, titles.size)
+            val titleCount = toIndex - i
+            publish?.invoke(Pair("Exporting titles $i to ${toIndex-1}\n", LogType.STANDARD))
+            val response = muClient.addTitlesToListByTitle(titles.subList(i, toIndex), readingListId)
+            val responseBody = response.body<BulkTitleAddResponse>()
+            if(responseBody.status.startsWith("partial")) {
+                if(responseBody.context!!.errors.size == titleCount)
+                {
+                    publish?.invoke(Pair("Failed to add titles $i to ${toIndex - 1}.\n${responseBody.context.errors.joinToString("\n","\t")}", LogType.ERROR))
+                } else {
+                    publish?.invoke(Pair("Failed to add some titles (${responseBody.context.errors.size} of $titleCount).\n${responseBody.context.errors.joinToString("\n","\t")}",LogType.WARNING))
+                }
+            } else {
+                publish?.invoke(Pair("Added $titleCount titles successfully\n", LogType.STANDARD))
+            }
+            println(responseBody)
+
+            delay(5000)
         }
     }
 }

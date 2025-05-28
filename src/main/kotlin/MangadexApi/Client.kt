@@ -24,15 +24,32 @@ import io.ktor.http.isSuccess
 import kotlinx.coroutines.delay
 import javax.swing.JTextPane
 
+/**
+ * Class to interact with MangaDex's API.
+ * @param username The MangaDex username.
+ * @param password The MangaDex password.
+ * @param clientId The MangaDex API client ID.
+ * @param clientSecret The MangaDex API client secret.
+ */
 class Client(
     private val username: String,
     private val password: String,
     private val clientId: String,
     private val clientSecret: String
 ) {
+    /**
+     * MangaDex API access token.
+     */
     private lateinit var accessToken: String
+
+    /**
+     * MangaDex API refresh token.
+     */
     private lateinit var refreshToken: String
 
+    /**
+     * Object to perform HTTP requests.
+     */
     private val httpClient: HttpClient = HttpClient(CIO) {
         expectSuccess = false
         install(ContentNegotiation) {
@@ -41,7 +58,7 @@ class Client(
         install(Auth) {
             bearer {
                 loadTokens {
-                    BearerTokens(accessToken, refreshToken)
+                    fetchTokens()
                 }
 
                 refreshTokens {
@@ -71,9 +88,9 @@ class Client(
     }
 
     /**
-     * Fetches an auth token for the client. Should be called prior to any other object usages
+     * Fetches an authorization token for the client.
      */
-    suspend fun fetchTokens() {
+    private suspend fun fetchTokens(): BearerTokens {
         val formParameters: Parameters = Parameters.build {
             append("grant_type", "password")
             append("username", username)
@@ -96,15 +113,15 @@ class Client(
             throw UnexpectedMDApiResponseException("API returned ${response.status} when trying to fetch a token.")
         }
         val body = response.body<TokenInfo>()
-        accessToken = body.accessToken
-        refreshToken = body.refreshToken
-        println("accessToken: $accessToken\nrefreshToken: $refreshToken")
+        return BearerTokens(body.accessToken, body.refreshToken)
     }
 
 
     /**
-     * @param limit Default 10; Max 100
-     * @param offset Might throw an error if offset is past the amount?
+     * Fetches manga from the user's [followed list](https://mangadex.org/titles/follows).
+     * @param limit Sets the max number of titles to fetch. The API will return at most this amount. Default 10; Max 100 (API limitation).
+     * @param offset The initial index to start fetching from.
+     * @return The full [HttpResponse] from the API.
      */
     suspend fun getFollowedMangaList(limit: Int = 10, offset: Int = 0): HttpResponse {
         return httpClient.get() {
@@ -119,9 +136,13 @@ class Client(
     }
 
     /**
-     *
+     * Returns all followed manga for the user.
+     * @param perFetchLimit Sets the limit of titles to fetch per API call. The API may send fewer titles in a single response, even if more exist. Max 100 (API limitation).
+     * @param initialOffset The initial index to start fetching from.
+     * @param localePreference The title to return for each [SimplifiedMangaInfo].
+     * @return A list of [SimplifiedMangaInfo] containing all titles fetched.
      */
-    suspend fun getAllFollowedManga(perFetchLimit: Int = 100, initialOffset: Int = 0, localePreference: Array<String> = arrayOf("ja","ja-ro","ko","ko-ro","zh","zh-hk","zh-ro","en"), logger: JTextPane? = null): MutableList<SimplifiedMangaInfo> {
+    suspend fun getAllFollowedManga(perFetchLimit: Int = 100, initialOffset: Int = 0, localePreference: Array<String> = arrayOf("ja","ja-ro","ko","ko-ro","zh","zh-hk","zh-ro","en"),): MutableList<SimplifiedMangaInfo> {
         //assume global ratelimit is 1 request/sec (I'm told 5)
         // pause 1 second before starting in case another request was already sent
         delay(1000)
@@ -172,7 +193,7 @@ class Client(
     }
 
     /**
-     * Function to determine if a endpoint needs auth headers. Unifnished
+     * Function to determine if an endpoint needs auth headers. Used exclusively for [httpClient].
      */
     private fun urlRequiresAuth(request: HttpRequestBuilder): Boolean {
         if (request.url.host == "auth.mangadex.org") return false

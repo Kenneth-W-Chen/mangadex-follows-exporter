@@ -32,6 +32,9 @@ import javax.swing.text.StyleConstants
 import kotlin.math.min
 import kotlin.text.toInt
 
+/**
+ * The main window with MangaDex follows exporting and MangaUpdates follows importing.
+ */
 class ExporterUI : JFrame("Mangadex Follows Exporter") {
     val windowMinWidth: Int = 600
     val windowMinHeight: Int = 1000
@@ -77,14 +80,19 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         isVisible = true
     }
 
+    /**
+     * Sets up the settings for the base frame and main panel.
+     */
     private fun initializeFrame() {
         setSize(800, 600)
         minimumSize = Dimension(windowMinWidth, windowMinHeight)
         defaultCloseOperation = EXIT_ON_CLOSE
         mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
-
     }
 
+    /**
+     * Creates the section for entering MangaDex user credentials (MangaDex Log-In Information) and adds it to the main panel.
+     */
     private fun addMDUserCredsSection() {
         val userCredsPanel = JPanel()
         userCredsPanel.layout = GridLayout(2, 2, 20, 0)
@@ -155,6 +163,11 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         mainPanel.add(saveLoadPanel)
     }
 
+    /**
+     * Gets a panel with a [JLabel] above its corresponding [JTextField].
+     * @param label The text for the [JLabel].
+     * @param textField The [JTextField] which is associated with the [JLabel].
+     */
     private fun getFieldLayoutPanel(label: String, textField: JTextField): JPanel {
         val layoutPanel = JPanel()
         layoutPanel.layout = BoxLayout(layoutPanel, BoxLayout.Y_AXIS)
@@ -169,6 +182,10 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         return layoutPanel
     }
 
+    /**
+     * Creates the section with the export settings (MangaDex Export Settings) and adds it to the main panel.
+     * See [getExportOptionsPanel], [getLinkOptionsPanel], [getLocaleOptionsPanel], and [getAPIOptionsPanel].
+     */
     private fun addMDSettingSections() {
         val settingsContentPanel = JPanel()
         val mdSettingsHeader = JLabel("MangaDex Export Settings")
@@ -292,6 +309,11 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         mainPanel.add(settingsMainPanel)
     }
 
+    /**
+     * Creates the export type options sub-section (CSV, TXT, MangaUpdates).
+     * See [addMDSettingSections].
+     * @return A [JPanel] containing the export options.
+     */
     private fun getExportOptionsPanel(): JPanel {
         // Export options
         val exportPanel = JPanel()
@@ -321,6 +343,11 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         return exportPanel
     }
 
+    /**
+     * Creates the links export option panel (AniList, MangaUpdates, etc.).
+     * See [addMDSettingSections].
+     * @return A [JPanel] containing the links export options.
+     */
     private fun getLinkOptionsPanel(): JPanel {
 
         val linksPanel = JPanel()
@@ -350,6 +377,11 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         return linksPanel
     }
 
+    /**
+     * Creates the title locale export preference panel (ja, ja-ro, en, etc.).
+     * See [addMDSettingSections].
+     * @return A [JPanel] containing the locale export preference.
+     */
     private fun getLocaleOptionsPanel(): JPanel {
         val titleLocaleMainPanel = JPanel()
         titleLocaleMainPanel.layout = BoxLayout(titleLocaleMainPanel, BoxLayout.Y_AXIS)
@@ -514,6 +546,11 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         return titleLocaleMainPanel
     }
 
+    /**
+     * Creates the MangaDex API options panel (API fetch limit, initial offset).
+     * See [addMDSettingSections].
+     * @return A [JPanel] containing the APi options.
+     */
     private fun getAPIOptionsPanel(): JPanel {
         val apiOptionsPanel = JPanel()
         apiOptionsPanel.layout = BoxLayout(apiOptionsPanel, BoxLayout.Y_AXIS)
@@ -554,6 +591,9 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         return apiOptionsPanel
     }
 
+    /**
+     * Creates the section for MangaUpdates settings (MangaUpdates Import Settings) and adds it to the main panel.
+     */
     private fun addMUSettingsSection(){
         mainPanel.add(Box.Filler(Dimension(20,20),Dimension(20,20),Dimension(20,20)))
         val muSettingsHeader = JLabel("MangaUpdates Import Settings")
@@ -615,6 +655,9 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 
     }
 
+    /**
+     * Creates the section with the Run button and the logging area ([logArea]).
+     */
     private fun addRunSection() {
         mainPanel.add(Box.Filler(Dimension(20,20),Dimension(20,20),Dimension(20,20)))
         val logPanel = JPanel()
@@ -720,6 +763,18 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     }
 }
 
+/**
+ * Background worker for fetching titles from MangaDex's API and exporting them to the selected export options.
+ * @param client A [MangadexApi.Client] for the user whose follows are being exported.
+ * @param logger The [JTextPane] which log information should be appended to.
+ * @param fetchLimit The number of titles to be fetched per MangaDex API call.
+ * @param initialOffset The index of the initial title to start fetching from.
+ * @param localePreference An array representing the preference for the title saved in the export options. Only applicable to the CSV and TXT export options.
+ * @param fileName The name of the file where titles will be exported to. Only applicable to the CSV and TXT export options.
+ * @param exportOptions Where to export the titles to. See [ExportOptions].
+ * @param saveLinks Which links to save from MangaDex. See [Links].
+ * @param muClient The MangaUpdates client where titles will be exported to. Only applicable to the MangaUpdates export option.
+ */
 class MangadexApiClientWorker(
     private val client: MangadexApi.Client,
     private val logger:JTextPane,
@@ -731,8 +786,14 @@ class MangadexApiClientWorker(
     private val saveLinks: EnumSet<Links>,
     private val muClient: MangaUpdatesAPI.Client? = null
 ): SwingWorker<Boolean, Pair<String, LogType>>(){
+    /**
+     * Whether the worker is currently running or not.
+     */
     public var running: Boolean = true
 
+    /**
+     * Imports titles from MangaDex to the selected [exportOptions].
+     */
     override fun doInBackground(): Boolean {
         running = true
         var list: MutableList<SimplifiedMangaInfo> = mutableListOf()
@@ -754,6 +815,9 @@ class MangadexApiClientWorker(
         return true
     }
 
+    /**
+     * Adds log information to [logger]
+     */
     override fun process(chunks: List<Pair<String, LogType>?>?) {
         if(chunks.isNullOrEmpty()) return
         for(pair in chunks){
@@ -762,20 +826,28 @@ class MangadexApiClientWorker(
         }
     }
 
+    /**
+     * General clean-up. Updates [running] and outputs completion to [logger].
+     */
     override fun done() {
         running = false
         publish(Pair("Done running\n", LogType.STANDARD))
         super.done()
     }
 
+    /**
+     * Wrapper for exporting the manga to the selected [exportOptions]. See [exportMangaList].
+     */
     @OptIn(DelicateCoroutinesApi::class)
     fun wrapper(list: MutableList<SimplifiedMangaInfo>) = GlobalScope.future{
         exportMangaList(list, fileName, saveLinks, exportOptions, BufferingMode.PER_TITLE,muClient, ::publish)
     }
 
+    /**
+     * Wrapper for importing titles from MangaDex. See [MangadexApi.Client.getAllFollowedManga] as the logic is essentially the same (print statements are swapped for logger.append).
+     */
     @OptIn(DelicateCoroutinesApi::class)
     fun fetchTitles(): CompletableFuture<MutableList<SimplifiedMangaInfo>> = GlobalScope.future {
-        client.fetchTokens()
         delay(1000)
         var currentOffset: Int = initialOffset
         var expectedTotal: Int = 99
@@ -827,10 +899,16 @@ class MangadexApiClientWorker(
 
 }
 
+/**
+ * Swaps the item at [index1] with [index2].
+ */
 fun <T> DefaultListModel<T>.swap(index1: Int, index2: Int) {
     set(index1, set(index2, elementAt(index1)))
 }
 
+/**
+ * Creates a copy of a [Box.Filler] with the same dimensions.
+ */
 fun Box.Filler.copy(): Box.Filler{
     val copy = Box.Filler(this.minimumSize, this.preferredSize, this.maximumSize)
     copy.alignmentX = this.alignmentX
@@ -838,6 +916,11 @@ fun Box.Filler.copy(): Box.Filler{
     return copy
 }
 
+/**
+ * Appends text to a [JTextPane].
+ * @param string The text to append.
+ * @param logType The type of log. Sets the color of [string] in the text pane. [LogType.STANDARD] - default font color, [LogType.WARNING] - a dark yellow, [LogType.ERROR] - [Color.RED]. Defaults to [LogType.STANDARD].
+ */
 fun JTextPane.append(string: String, logType: LogType = LogType.STANDARD){
     val style: Style?
     when(logType){
@@ -856,12 +939,29 @@ fun JTextPane.append(string: String, logType: LogType = LogType.STANDARD){
     styledDocument.insertString(styledDocument.length, string,style)
 }
 
+/**
+ * Converts a [DefaultListModel] to an Array of strings.
+ */
 fun DefaultListModel<String>.toStringArray(): Array<String> {
     return Array<String>(this.size, {i -> "" + this[i]})
 }
 
+/**
+ * Represents the type of log being added to the log area. See [JTextPane.append].
+ */
 enum class LogType{
+    /**
+     * Normal or "standard" logs i.e., general information regarding current status.
+     */
     STANDARD,
+
+    /**
+     * Warning logs i.e., non-critical issues that don't affect running significantly.
+     */
     WARNING,
+
+    /**
+     * Error logs i.e., information that would be output to STDERR; issues that prevent the program from running properly.
+     */
     ERROR,
 }

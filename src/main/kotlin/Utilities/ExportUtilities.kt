@@ -18,6 +18,10 @@ import kotlin.collections.set
 import kotlin.io.path.*
 import kotlin.math.min
 
+/**
+ * Links that MangaDex stores with each series. Enum name is the enum name used by MangaDex.
+ * @param canonicalName The actual name of the link (e.g., [Links.amz] is "Amazon").
+ */
 enum class Links(val canonicalName: String) {
     amz("Amazon"),
     al("AniList"),
@@ -34,18 +38,51 @@ enum class Links(val canonicalName: String) {
 }
 
 
-
+/**
+ * Buffering mode for exporting titles to a TXT/CSV. See [exportMangaList] and [writeToTextFile].
+ */
 enum class BufferingMode{
+    /**
+     * Writes to the file for each title before reading information for the next title. Use this if you're worried about stack overflow due to insufficient memory.
+     */
     PER_TITLE,
+
+    /**
+     * Writes to the file once for the entire list. Use this if you don't want the program to repeatedly open and close files.
+     */
     PER_LIST
 }
 
+/**
+ * Where the manga list should be exported to.
+ */
 enum class ExportOptions{
+    /**
+     * Exports it to a separate text file for the titles, and each link.
+     */
     TXT,
+
+    /**
+     * Exports it to a single CSV.
+     */
     CSV,
+
+    /**
+     * Exports it to MangaUpdates. See [MangaUpdatesAPI.Client.addTitlesToListByTitle] and [MangaUpdatesAPI.Client.addTitlesToListById].
+     */
     MANGAUPDATES
 }
 
+/**
+ * Exports a list of [SimplifiedMangaInfo] to the specified export options.
+ * @param mangaList The list of manga to export.
+ * @param fileName The base filename of the files where title information will be stored. The full filename will be "[fileName]_yyyy_MM_dd_HH_mm_ss.{fileformat}". For text files, the type will be appended after "[fileName]_".
+ * @param saveLinks The links to save. See [Links].
+ * @param exportOptions Which formats to export the list to. See [ExportOptions].
+ * @param bufferingMode See [BufferingMode].
+ * @param muClient The [MangaUpdatesAPI.Client] to be used if [ExportOptions.MANGAUPDATES] is set.
+ * @param publish A function to consume logging information. Used for [MangadexApiClientWorker.publish].
+ */
 suspend fun exportMangaList(
     mangaList: MutableList<SimplifiedMangaInfo>,
     fileName: String = "My_MangaDex_Follows",
@@ -188,6 +225,13 @@ suspend fun exportMangaList(
     }
 }
 
+/**
+ * Exports a list of [SimplifiedMangaInfo] to some text files. Essentially [exportMangaList] but without CSVs or MangaUpdates.
+ * @param mangaList The list of manga to export.
+ * @param fileName The base filename of the files where title information will be stored. The full filename will be "[fileName]_{Type}_yyyy_MM_dd_HH_mm_ss.txt", where "Type" will be "Titles" or one of [Links.name].
+ * @param saveLinks The links to save. See [Links].
+ * @param bufferingMode See [BufferingMode].
+ */
 fun writeToTextFile(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String = "My_MangaDex_Follows", saveLinks: EnumSet<Links> = EnumSet.allOf(Links::class.java), bufferingMode: BufferingMode=BufferingMode.PER_TITLE) {
     val fileNameEnd: String = "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy_MM_dd_HH_mm_ss")) + ".txt"
     val homeDir: String = System.getProperty("user.home")

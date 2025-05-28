@@ -24,9 +24,20 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 
+/**
+ * Class to interact with MangaUpdates' API.
+ * @param username The MangaUpdates user's username.
+ * @param password The MangaUpdates user's password.
+ */
 class Client(private val username: String, private val password: String) {
+    /**
+     * MangaUpdates API version. This was initially made and tested with v1.
+     */
     private val apiVersion = "v1"
 
+    /**
+     * Object to perform HTTP requests.
+     */
     private var client: HttpClient = HttpClient(){
         expectSuccess = false
         install(Auth){
@@ -43,6 +54,11 @@ class Client(private val username: String, private val password: String) {
         }
     }
 
+    /**
+     * Fetches the user's reading lists.
+     * @return List of [ListData] representing the user's lists.
+     * @throws UnexpectedMUApiResponseException Thrown if the server doesn't respond with a success code.
+     */
     suspend fun fetchLists(): List<ListData> {
         val response: HttpResponse = client.get{
             url{
@@ -57,6 +73,13 @@ class Client(private val username: String, private val password: String) {
         return response.body<List<ListData>>()
     }
 
+    /**
+     * Adds series to a list by their ID. Will repeat in 5-second increments if the server returns HTTP412.
+     * @param seriesIds List of IDs to add.
+     * @param listId The reading list to add the series to.
+     * @return The response from the server. Useful for diagnosing partial successes.
+     * @throws UnexpectedMUApiResponseException Thrown if the server doesn't respond with a success code.
+     */
     suspend fun addTitlesToListById(seriesIds: MutableList<String>, listId: String): HttpResponse {
         var body: String = "["
         for(seriesId in seriesIds){
@@ -98,6 +121,13 @@ class Client(private val username: String, private val password: String) {
         return response
     }
 
+    /**
+     * Adds series to a list by their ID. Will repeat in 5-second increments if the server returns HTTP412.
+     * @param titles Title of the series to add.
+     * @param listId The reading list to add the series to.
+     * @return The response from the server. Useful for diagnosing partial successes.
+     * @throws UnexpectedMUApiResponseException Thrown if the server doesn't respond with a success code.
+     */
     suspend fun addTitlesToListByTitle(titles: List<String>, listId: String): HttpResponse {
         val body: JsonArray = buildJsonArray {
             for(title in titles){
@@ -131,6 +161,13 @@ class Client(private val username: String, private val password: String) {
         return response
     }
 
+    /**
+     * Gets a series' ID from the page ID. This function only exists because MangaDex stores the wrong ID.
+     * Because this fetches the actual series page (and therefore fetches a lot of data), this probably shouldn't be used without client rate limiting.
+     * @param pageId The page ID i.e., https://www.mangaupdates.com/series/{pageId}/ or https://www.mangaupdates.com/series.html?id={pageId}.
+     * @return The actual ID.
+     * @throws UnexpectedMUApiResponseException Thrown if the server doesn't respond with a success code.
+     */
     suspend fun getTitleId(pageId: String): String{
         var response = client.get{
             url{
@@ -158,6 +195,14 @@ class Client(private val username: String, private val password: String) {
         return Regex("href=\"https:\\/\\/api.mangaupdates.com\\/v1\\/series\\/([0-9]+)\\/rss\">").find(response.body<String>())!!.groupValues[1]
     }
 
+    /**
+     * Creates a reading list.
+     * @param title The title of the new list.
+     * @param description The description of the new list.
+     * @param type The type of list. See [ListType].
+     * @return The list's ID.
+     * @throws UnexpectedMUApiResponseException Thrown if the server doesn't respond with a success code.
+     */
     suspend fun makeList(title: String, description: String, type: ListType): String{
        val url = buildUrl{
             protocol = URLProtocol.HTTPS
@@ -186,6 +231,9 @@ class Client(private val username: String, private val password: String) {
         return response.body<CreateCustomListResponse>().context.id
     }
 
+    /**
+     * Fetches a session token for the API client.
+     */
     private suspend fun fetchToken(): BearerTokens {
         var response: HttpResponse
         try {
@@ -206,6 +254,9 @@ class Client(private val username: String, private val password: String) {
         return BearerTokens(responseBody.context!!.sessionToken, null)
     }
 
+    /**
+     * Function to determine if an endpoint needs auth headers. Used exclusively for [client].
+     */
     private fun urlRequiresAuth(url: URLBuilder): Boolean{
         if(url.host != "api.mangaupdates.com") return false
         if(url.pathSegments.isEmpty() || url.pathSegments.size < 2) return false

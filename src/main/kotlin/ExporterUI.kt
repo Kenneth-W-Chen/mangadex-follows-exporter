@@ -1,7 +1,9 @@
 import MangadexApi.Data.MangaInfoResponse
 import MangadexApi.Data.SimplifiedMangaInfo
+import Utilities.BufferingMode
 import Utilities.ExportOptions
 import Utilities.Links
+import Utilities.MangaUpdatesImportMethod
 import Utilities.SettingsManager
 import Utilities.exportMangaList
 import io.ktor.client.call.body
@@ -638,15 +640,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
                     SettingsManager.SecretsKeys.MU_PASSWORD to muPasswordField.text,
                 )
             )
-            var selectedIndex: Int = -1
-            for(i in 0..muImportSettingsButtons.size - 1) {
-                if (muImportSettingsButtons[i].isSelected){
-                    selectedIndex = i
-                    break
-                }
-            }
             settings.saveSettings(
-                mapOf(SettingsManager.SettingsKeys.MANGAUPDATES_IMPORT to selectedIndex.toString())
+                mapOf(SettingsManager.SettingsKeys.MANGAUPDATES_IMPORT to muImportSettingsButtons.getSelectedIndex().toString())
             )
             logArea.append("Saved.\n")
         }
@@ -772,7 +767,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
                 "My_MangaDex_Follows",
                 exportOptions,
                 saveLinks,
-                muClient
+                muClient,
+                MangaUpdatesImportMethod.entries[muImportSettingsButtons.getSelectedIndex()]
             )
             runWorker.execute()
         }
@@ -813,7 +809,8 @@ class MangadexApiClientWorker(
     private val fileName: String,
     private val exportOptions: EnumSet<ExportOptions>,
     private val saveLinks: EnumSet<Links>,
-    private val muClient: MangaUpdatesAPI.Client? = null
+    private val muClient: MangaUpdatesAPI.Client? = null,
+    private val muImportMethod: MangaUpdatesImportMethod = MangaUpdatesImportMethod.TITLE
 ): SwingWorker<Boolean, Pair<String, LogType>>(){
     /**
      * Whether the worker is currently running or not.
@@ -869,7 +866,8 @@ class MangadexApiClientWorker(
      */
     @OptIn(DelicateCoroutinesApi::class)
     fun wrapper(list: MutableList<SimplifiedMangaInfo>) = GlobalScope.future{
-        exportMangaList(list, fileName, saveLinks, exportOptions, muClient, publish = ::publish)
+        exportMangaList(list, fileName, saveLinks, exportOptions, BufferingMode.PER_LIST, muClient,
+            muImportMethod, publish = ::publish)
     }
 
     /**
@@ -973,6 +971,15 @@ fun JTextPane.append(string: String, logType: LogType = LogType.STANDARD){
  */
 fun DefaultListModel<String>.toStringArray(): Array<String> {
     return Array<String>(this.size, {i -> "" + this[i]})
+}
+
+fun Array<JRadioButton>.getSelectedIndex(): Int{
+    for(i in 0..this.size-1){
+        if(this[i].isSelected){
+            return i
+        }
+    }
+    return -1
 }
 
 /**

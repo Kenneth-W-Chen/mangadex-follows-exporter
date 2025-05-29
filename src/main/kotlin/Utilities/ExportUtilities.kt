@@ -12,7 +12,6 @@ import kotlin.io.path.Path
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.EnumSet
-import java.util.function.Consumer
 import kotlin.collections.forEach
 import kotlin.collections.set
 import kotlin.io.path.*
@@ -74,6 +73,21 @@ enum class ExportOptions{
 }
 
 /**
+ * The method to import series to MangaUpdates.
+ */
+enum class MangaUpdatesImportMethod {
+    /**
+     * Uses MangaUpdates IDs. This method is slow, but is guaranteed to work. It takes about 5 seconds per series. Series that don't have a MangaUpdates link on MangaDex won't be added.
+     */
+    ID,
+
+    /**
+     * Uses series titles as provided by MangaDex. There's no guarantee this will work for every title since MangaUpdates might not have that particular title for the series.
+     */
+    TITLE
+}
+
+/**
  * Exports a list of [SimplifiedMangaInfo] to the specified export options.
  * @param mangaList The list of manga to export.
  * @param fileName The base filename of the files where title information will be stored. The full filename will be "[fileName]_yyyy_MM_dd_HH_mm_ss.{fileformat}". For text files, the type will be appended after "[fileName]_".
@@ -92,7 +106,8 @@ suspend fun exportMangaList(
     ),
     bufferingMode: BufferingMode = BufferingMode.PER_TITLE,
     muClient: Client? = null,
-    publish: ((Pair<String, LogType>)->Unit)? = null
+    muImportMethod: MangaUpdatesImportMethod = MangaUpdatesImportMethod.TITLE,
+    publish: ((Pair<String, LogType>) -> Unit)? = null
 ){
     val homeDir: String = System.getProperty("user.home")
     var titlesFile: Path? = null
@@ -114,32 +129,6 @@ suspend fun exportMangaList(
         if(makeCsv){
             csvFile = Path(homeDir, "${fileName}_$fileNameEnd.csv")
             csvFile.createFile()
-        }
-    }
-
-    suspend fun mangaUpdatesExportByID(){
-        val readingLists = muClient!!.fetchLists()
-        val mdList = readingLists.firstOrNull { it.title == "MangaDex Reading List" }
-        var readingListId: String = ""
-        if(mdList!=null){
-            readingListId = mdList.listId
-        } else{
-            readingListId = muClient.makeList("MangaDex Reading List", "List of follows exported from MangaDex", ListType.READ)
-        }
-        val titleIds: MutableList<String> = mutableListOf()
-        for(manga in mangaList){
-            if(manga.links == null || manga.links["mu"] == null) continue
-            delay(5000)
-            titleIds.add(muClient.getTitleId(manga.links["mu"].toString()))
-        }
-        publish?.invoke(Pair("Beginning MangaUpdates export...\n", LogType.STANDARD))
-        for(i in 0..titleIds.size - 1 step 100){
-            val toIndex = min(i + 100, titleIds.size - 1)
-            publish?.invoke(Pair("Exporting titles $i to ${toIndex-1}\n", LogType.STANDARD))
-            val response = muClient.addTitlesToListById(titleIds.subList(i, toIndex), readingListId)
-            publish?.invoke(Pair("Finished with response: ${response.body<String>()}\n", LogType.STANDARD))
-            println(response.body<String>())
-            delay(5000)
         }
     }
 
@@ -192,35 +181,9 @@ suspend fun exportMangaList(
         }
     }
     if(exportMangaUpdates) {
-        val readingLists = muClient!!.fetchLists()
-        val mdList = readingLists.firstOrNull { it.title == "MangaDex Reading List" }
-        var readingListId: String = ""
-        if(mdList!=null){
-            readingListId = mdList.listId
-        } else{
-            readingListId = muClient.makeList("MangaDex Reading List", "List of follows exported from MangaDex", ListType.READ)
-        }
-        val titles: List<String> = mangaList.map { mangaInfo -> mangaInfo.title.trim({it == '\''||it=='"'||it=='\n'||it=='\r'||it==' '}) }
-        publish?.invoke(Pair("Beginning MangaUpdates export...\n", LogType.STANDARD))
-        for(i in 0..titles.size - 1 step 100){
-            val toIndex = min(i + 100, titles.size)
-            val titleCount = toIndex - i
-            publish?.invoke(Pair("Exporting titles $i to ${toIndex-1}\n", LogType.STANDARD))
-            val response = muClient.addTitlesToListByTitle(titles.subList(i, toIndex), readingListId)
-            val responseBody = response.body<BulkTitleAddResponse>()
-            if(responseBody.status.startsWith("partial")) {
-                if(responseBody.context!!.errors.size == titleCount)
-                {
-                    publish?.invoke(Pair("Failed to add titles $i to ${toIndex - 1}.\n${responseBody.context.errors.joinToString("\n","\t")}", LogType.ERROR))
-                } else {
-                    publish?.invoke(Pair("Failed to add some titles (${responseBody.context.errors.size} of $titleCount).\n${responseBody.context.errors.joinToString("\n","\t")}",LogType.WARNING))
-                }
-            } else {
-                publish?.invoke(Pair("Added $titleCount titles successfully\n", LogType.STANDARD))
-            }
-            println(responseBody)
-
-            delay(5000)
+        when(muImportMethod){
+            MangaUpdatesImportMethod.ID -> importToMangaUpdatesByID(muClient!!, mangaList, publish)
+            MangaUpdatesImportMethod.TITLE -> importToMangaUpdatesByTitle(muClient!!, mangaList, publish)
         }
     }
 }
@@ -282,3 +245,62 @@ fun writeToTextFile(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String
         statsFile.appendText("\t" + link.name + ":\t" + nullLinks[link]!!.toString())
     }
 }
+
+/**
+ * Imports a list of manga to MangaUpdates by their title. Not guaranteed to work for every series, even if MangaUpdates has that series, if the title has a typo, is in a different locale than what MangaUpdates stores, or other reasons.
+ * @param mangaList The list of manga to export.
+ * @param muClient The [MangaUpdatesAPI.Client] to be used if [ExportOptions.MANGAUPDATES] is set.
+ * @param publish A function to consume logging information. Used for [MangadexApiClientWorker.publish].
+ */
+suspend fun importToMangaUpdatesByTitle(muClient: MangaUpdatesAPI.Client, mangaList: MutableList<SimplifiedMangaInfo>, publish: ((Pair<String, LogType>)->Unit)? = null) {
+    val readingListId = muClient.getListId("MangaDex Reading List")
+    val titles: List<String> = mangaList.map { mangaInfo -> mangaInfo.title.trim({it == '\''||it=='"'||it=='\n'||it=='\r'||it==' '}) }
+    publish?.invoke(Pair("Beginning MangaUpdates export...\n", LogType.STANDARD))
+    for(i in 0..titles.size - 1 step 100){
+        val toIndex = min(i + 100, titles.size)
+        val titleCount = toIndex - i
+        publish?.invoke(Pair("Exporting titles $i to ${toIndex-1}\n", LogType.STANDARD))
+        val response = muClient.addTitlesToListByTitle(titles.subList(i, toIndex), readingListId)
+        val responseBody = response.body<BulkTitleAddResponse>()
+        if(responseBody.status.startsWith("partial")) {
+            if(responseBody.context!!.errors.size == titleCount)
+            {
+                publish?.invoke(Pair("Failed to add titles $i to ${toIndex - 1}.\n${responseBody.context.errors.joinToString("\n","\t")}", LogType.ERROR))
+            } else {
+                publish?.invoke(Pair("Failed to add some titles (${responseBody.context.errors.size} of $titleCount).\n${responseBody.context.errors.joinToString("\n","\t")}",LogType.WARNING))
+            }
+        } else {
+            publish?.invoke(Pair("Added $titleCount titles successfully\n", LogType.STANDARD))
+        }
+        println(responseBody)
+
+        delay(5000)
+    }
+}
+
+/**
+ * Imports a list of manga to MangaUpdates by their ID. Takes a long time.
+ * @param mangaList The list of manga to export.
+ * @param muClient The [MangaUpdatesAPI.Client] to be used if [ExportOptions.MANGAUPDATES] is set.
+ * @param publish A function to consume logging information. Used for [MangadexApiClientWorker.publish].
+ */
+suspend fun importToMangaUpdatesByID(muClient: MangaUpdatesAPI.Client, mangaList: MutableList<SimplifiedMangaInfo>, publish: ((Pair<String, LogType>)->Unit)? = null) {
+    val readingListId = muClient.getListId("MangaDex Reading List")
+    val titleIds: MutableList<String> = mutableListOf()
+    publish?.invoke(Pair("Getting title IDs. This will take at least ${mangaList.size*5/60} minutes.\n", LogType.STANDARD))
+    for(manga in mangaList){
+        if(manga.links == null || manga.links["mu"] == null) continue
+        delay(5000)
+        titleIds.add(muClient.getTitleId(manga.links["mu"].toString()))
+    }
+    publish?.invoke(Pair("Beginning MangaUpdates export...\n", LogType.STANDARD))
+    for(i in 0..titleIds.size - 1 step 100){
+        val toIndex = min(i + 100, titleIds.size - 1)
+        publish?.invoke(Pair("Exporting titles $i to ${toIndex-1}\n", LogType.STANDARD))
+        val response = muClient.addTitlesToListById(titleIds.subList(i, toIndex), readingListId)
+        publish?.invoke(Pair("Finished with response: ${response.body<String>()}\n", LogType.STANDARD))
+        println(response.body<String>())
+        delay(5000)
+    }
+}
+

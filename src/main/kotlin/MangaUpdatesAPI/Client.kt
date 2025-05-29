@@ -232,6 +232,24 @@ class Client(private val username: String, private val password: String) {
     }
 
     /**
+     * Returns the list ID with the given title. If the list doesn't exist, creates the list and returns the new list's ID.
+     * @param title The title of the list whose ID will be returned.
+     * @param description The description of the list, if a new list will be created. Defaults to null.
+     * @return The list's ID.
+     */
+    suspend fun getListId(title: String, description: String? = null): String{
+        val readingLists = fetchLists()
+        val mdList = readingLists.firstOrNull { it.title == title }
+        var readingListId: String = ""
+        if(mdList!=null){
+            readingListId = mdList.listId
+        } else{
+            readingListId = makeList(title, description.toString(), ListType.READ)
+        }
+        return readingListId
+    }
+
+    /**
      * Fetches a session token for the API client.
      */
     private suspend fun fetchToken(): BearerTokens {

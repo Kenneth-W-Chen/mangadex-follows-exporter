@@ -1,6 +1,5 @@
 import MangadexApi.Data.MangaInfoResponse
 import MangadexApi.Data.SimplifiedMangaInfo
-import Utilities.BufferingMode
 import Utilities.ExportOptions
 import Utilities.Links
 import Utilities.SettingsManager
@@ -621,6 +620,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         importSettingsPanel.add(Box.Filler(Dimension(20,20),Dimension(20,20),Dimension(20,20)))
         muImportSettingsButtonGroup.add(muImportSettingsButtons[1])
         importSettingsPanel.add(muImportSettingsButtons[1])
+        muImportSettingsButtons[0].isSelected = true
 
         val saveLoadPanel = JPanel()
         saveLoadPanel.layout = BoxLayout(saveLoadPanel, BoxLayout.X_AXIS)
@@ -869,7 +869,7 @@ class MangadexApiClientWorker(
      */
     @OptIn(DelicateCoroutinesApi::class)
     fun wrapper(list: MutableList<SimplifiedMangaInfo>) = GlobalScope.future{
-        exportMangaList(list, fileName, saveLinks, exportOptions, BufferingMode.PER_TITLE,muClient, ::publish)
+        exportMangaList(list, fileName, saveLinks, exportOptions, muClient, publish = ::publish)
     }
 
     /**

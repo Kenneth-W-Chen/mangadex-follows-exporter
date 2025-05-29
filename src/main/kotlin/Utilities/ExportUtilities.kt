@@ -2,6 +2,7 @@ package Utilities
 
 import LogType
 import MangaUpdatesAPI.Client
+import MangaUpdatesAPI.Exceptions.UnexpectedMUApiResponseException
 import MangaUpdatesAPI.ResponseClasses.BulkTitleAddResponse
 import MangaUpdatesAPI.ResponseClasses.ListType
 import MangadexApi.Data.SimplifiedMangaInfo
@@ -287,19 +288,41 @@ suspend fun importToMangaUpdatesByTitle(muClient: MangaUpdatesAPI.Client, mangaL
 suspend fun importToMangaUpdatesByID(muClient: MangaUpdatesAPI.Client, mangaList: MutableList<SimplifiedMangaInfo>, publish: ((Pair<String, LogType>)->Unit)? = null) {
     val readingListId = muClient.getListId("MangaDex Reading List")
     val titleIds: MutableList<String> = mutableListOf()
-    publish?.invoke(Pair("Getting title IDs. This will take at least ${mangaList.size*5/60} minutes.\n", LogType.STANDARD))
+    var estDuration = mangaList.size.toDouble() * 5.0 / 60.0
+    val durationUnits: String
+    if(estDuration < 1.0) {
+        estDuration *= 60
+        durationUnits = "second(s)"
+    } else if (estDuration > 60.0){
+        estDuration /= 60
+        durationUnits = "hour(s)"
+    } else {
+        durationUnits = "minute(s)"
+    }
+    publish?.invoke(Pair("Getting title IDs. This will take at least $estDuration $durationUnits.\n", LogType.STANDARD))
     for(manga in mangaList){
-        if(manga.links == null || manga.links["mu"] == null) continue
+        if(manga.links == null || !manga.links.containsKey("mu")) {
+            publish?.invoke(Pair("Ignoring ${manga.title} because it doesn't have a title\n", LogType.WARNING))
+            continue
+        }
+        publish?.invoke(Pair("Fetching ID for ${manga.title}\n", LogType.STANDARD))
         delay(5000)
-        titleIds.add(muClient.getTitleId(manga.links["mu"].toString()))
+        val id = muClient.getTitleId(manga.links["mu"].toString())
+        if(id.isEmpty()) publish?.invoke(Pair("Could not get MangaUpdates page for ${manga.title} (${manga.links["mu"]})\n", LogType.WARNING))
+        publish?.invoke(Pair("Got ID for ${manga.title}: $id\n", LogType.STANDARD))
+        titleIds.add(id)
     }
     publish?.invoke(Pair("Beginning MangaUpdates export...\n", LogType.STANDARD))
     for(i in 0..titleIds.size - 1 step 100){
-        val toIndex = min(i + 100, titleIds.size - 1)
+        val toIndex = min(i + 100, titleIds.size)
         publish?.invoke(Pair("Exporting titles $i to ${toIndex-1}\n", LogType.STANDARD))
-        val response = muClient.addTitlesToListById(titleIds.subList(i, toIndex), readingListId)
-        publish?.invoke(Pair("Finished with response: ${response.body<String>()}\n", LogType.STANDARD))
-        println(response.body<String>())
+        try {
+            val response = muClient.addTitlesToListById(titleIds.subList(i, toIndex), readingListId)
+            publish?.invoke(Pair("Finished with response: ${response.body<String>()}\n", LogType.STANDARD))
+        } catch (e: UnexpectedMUApiResponseException) {
+            publish?.invoke(Pair("Export of titles ($i -> ${toIndex-1}) failed due to a non-success code: $e\n", LogType.ERROR))
+        }
+
         delay(5000)
     }
 }

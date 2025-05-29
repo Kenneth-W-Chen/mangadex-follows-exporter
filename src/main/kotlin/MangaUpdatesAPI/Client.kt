@@ -173,8 +173,7 @@ class Client(private val username: String, private val password: String) {
             url{
                 protocol = URLProtocol.HTTPS
                 host = "www.mangaupdates.com"
-                path("series.html")
-                parameter("id", pageId)
+                appendPathSegments("series", pageId.trim{c -> c == '"' || c.isWhitespace()})
             }
         }
         while(response.status == HttpStatusCode.PreconditionFailed){
@@ -183,16 +182,39 @@ class Client(private val username: String, private val password: String) {
                 url{
                     protocol = URLProtocol.HTTPS
                     host = "www.mangaupdates.com"
-                    path("series.html")
-                    parameter("id", pageId)
+                    appendPathSegments("series", pageId.trim{c -> c == '"' || c.isWhitespace()})
                 }
             }
         }
-
-        if(!response.status.isSuccess()){
-            throw UnexpectedMUApiResponseException("Unexpected response from server when fetching title ID by title: ${response.status}: ${response.body<String>()}")
+        if(response.status == HttpStatusCode.NotFound){
+            response = client.get{
+                url{
+                    protocol = URLProtocol.HTTPS
+                    host = "www.mangaupdates.com"
+                    path("series.html")
+                    parameter("id", pageId.trim{c -> c == '"' || c.isWhitespace()})
+                }
+            }
+            while(response.status == HttpStatusCode.PreconditionFailed){
+                delay(5000)
+                response = client.get{
+                    url{
+                        protocol = URLProtocol.HTTPS
+                        host = "www.mangaupdates.com"
+                        path("series.html")
+                        parameter("id", pageId.trim{c -> c == '"' || c.isWhitespace()})
+                    }
+                }
+            }
         }
-        return Regex("href=\"https:\\/\\/api.mangaupdates.com\\/v1\\/series\\/([0-9]+)\\/rss\">").find(response.body<String>())!!.groupValues[1]
+        if(!response.status.isSuccess()){
+            throw UnexpectedMUApiResponseException("Unexpected response from server when fetching series ID by page ID ($pageId): ${response.status}: ${response.body<String>()}")
+        }
+        return try {
+            Regex("href=\"https:\\/\\/api.mangaupdates.com\\/v1\\/series\\/([0-9]+)\\/rss\">").find(response.body<String>())!!.groupValues[1]
+        } catch(e: NullPointerException){
+            ""
+        }
     }
 
     /**

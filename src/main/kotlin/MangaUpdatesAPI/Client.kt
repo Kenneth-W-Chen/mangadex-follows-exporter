@@ -173,8 +173,7 @@ class Client(private val username: String, private val password: String) {
             url{
                 protocol = URLProtocol.HTTPS
                 host = "www.mangaupdates.com"
-                path("series.html")
-                parameter("id", pageId)
+                appendPathSegments("series", pageId.trim{c -> c == '"' || c.isWhitespace()})
             }
         }
         while(response.status == HttpStatusCode.PreconditionFailed){
@@ -183,16 +182,39 @@ class Client(private val username: String, private val password: String) {
                 url{
                     protocol = URLProtocol.HTTPS
                     host = "www.mangaupdates.com"
-                    path("series.html")
-                    parameter("id", pageId)
+                    appendPathSegments("series", pageId.trim{c -> c == '"' || c.isWhitespace()})
                 }
             }
         }
-
-        if(!response.status.isSuccess()){
-            throw UnexpectedMUApiResponseException("Unexpected response from server when fetching title ID by title: ${response.status}: ${response.body<String>()}")
+        if(response.status == HttpStatusCode.NotFound){
+            response = client.get{
+                url{
+                    protocol = URLProtocol.HTTPS
+                    host = "www.mangaupdates.com"
+                    path("series.html")
+                    parameter("id", pageId.trim{c -> c == '"' || c.isWhitespace()})
+                }
+            }
+            while(response.status == HttpStatusCode.PreconditionFailed){
+                delay(5000)
+                response = client.get{
+                    url{
+                        protocol = URLProtocol.HTTPS
+                        host = "www.mangaupdates.com"
+                        path("series.html")
+                        parameter("id", pageId.trim{c -> c == '"' || c.isWhitespace()})
+                    }
+                }
+            }
         }
-        return Regex("href=\"https:\\/\\/api.mangaupdates.com\\/v1\\/series\\/([0-9]+)\\/rss\">").find(response.body<String>())!!.groupValues[1]
+        if(!response.status.isSuccess()){
+            throw UnexpectedMUApiResponseException("Unexpected response from server when fetching series ID by page ID ($pageId): ${response.status}: ${response.body<String>()}")
+        }
+        return try {
+            Regex("href=\"https:\\/\\/api.mangaupdates.com\\/v1\\/series\\/([0-9]+)\\/rss\">").find(response.body<String>())!!.groupValues[1]
+        } catch(e: NullPointerException){
+            ""
+        }
     }
 
     /**
@@ -229,6 +251,24 @@ class Client(private val username: String, private val password: String) {
             throw UnexpectedMUApiResponseException("Unexpected response from server when making a new reading list: ${response.status}: ${response.body<String>()}")
         }
         return response.body<CreateCustomListResponse>().context.id
+    }
+
+    /**
+     * Returns the list ID with the given title. If the list doesn't exist, creates the list and returns the new list's ID.
+     * @param title The title of the list whose ID will be returned.
+     * @param description The description of the list, if a new list will be created. Defaults to null.
+     * @return The list's ID.
+     */
+    suspend fun getListId(title: String, description: String? = null): String{
+        val readingLists = fetchLists()
+        val mdList = readingLists.firstOrNull { it.title == title }
+        var readingListId: String = ""
+        if(mdList!=null){
+            readingListId = mdList.listId
+        } else{
+            readingListId = makeList(title, description.toString(), ListType.READ)
+        }
+        return readingListId
     }
 
     /**

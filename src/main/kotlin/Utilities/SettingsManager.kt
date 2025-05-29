@@ -129,6 +129,11 @@ class SettingsManager {
         /**
          * The number of titles to fetch per MangaDex API call. See [MangadexApi.Client.getAllFollowedManga].
          */
-        FETCH_LIMIT
+        FETCH_LIMIT,
+
+        /**
+         * How titles are added to a MangaUpdates list. See [MangaUpdatesAPI.Client.addTitlesToListById] and [MangaUpdatesAPI.Client.addTitlesToListByTitle].
+         */
+        MANGAUPDATES_IMPORT
     }
 }

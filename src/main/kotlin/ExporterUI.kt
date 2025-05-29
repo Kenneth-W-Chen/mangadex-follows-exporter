@@ -3,6 +3,7 @@ import MangadexApi.Data.SimplifiedMangaInfo
 import Utilities.BufferingMode
 import Utilities.ExportOptions
 import Utilities.Links
+import Utilities.MangaUpdatesImportMethod
 import Utilities.SettingsManager
 import Utilities.exportMangaList
 import io.ktor.client.call.body
@@ -60,6 +61,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
 
     var muUsernameField: JTextField = JTextField()
     var muPasswordField: JTextField = JTextField()
+    val muImportSettingsButtonGroup: ButtonGroup = ButtonGroup()
+    val muImportSettingsButtons: Array<JRadioButton> = arrayOf(JRadioButton("Based on ID"), JRadioButton("Based on title"))
 
     val logArea: JTextPane = object: JTextPane(){
         override fun getScrollableTracksViewportWidth(): Boolean {
@@ -609,33 +612,53 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         muSettingsPanel.add(getFieldLayoutPanel("Username",muUsernameField))
         muSettingsPanel.add(getFieldLayoutPanel("Password",muPasswordField))
 
+        val importSettingsPanel = JPanel()
+        importSettingsPanel.layout = BoxLayout(importSettingsPanel, BoxLayout.X_AXIS)
+
+        importSettingsPanel.alignmentX = CENTER_ALIGNMENT
+        importSettingsPanel.alignmentY = CENTER_ALIGNMENT
+        muImportSettingsButtonGroup.add(muImportSettingsButtons[0])
+        importSettingsPanel.add(muImportSettingsButtons[0])
+        importSettingsPanel.add(Box.Filler(Dimension(20,20),Dimension(20,20),Dimension(20,20)))
+        muImportSettingsButtonGroup.add(muImportSettingsButtons[1])
+        importSettingsPanel.add(muImportSettingsButtons[1])
+        muImportSettingsButtons[0].isSelected = true
+
         val saveLoadPanel = JPanel()
         saveLoadPanel.layout = BoxLayout(saveLoadPanel, BoxLayout.X_AXIS)
         saveLoadPanel.alignmentY = CENTER_ALIGNMENT
         saveLoadPanel.alignmentX = CENTER_ALIGNMENT
 
-        val saveButton = JButton("Save to File")
+        val saveButton = JButton("Save MangaUpdate Settings")
         saveButton.alignmentX = CENTER_ALIGNMENT
         saveButton.alignmentY = CENTER_ALIGNMENT
         saveButton.addActionListener {
-            logArea.append("Saving MangaUpdates user credentials....\n")
+            logArea.append("Saving MangaUpdates settings....\n")
             settings.saveUserCredentials(
                 mapOf(
                     SettingsManager.SecretsKeys.MU_USERNAME to muUsernameField.text,
                     SettingsManager.SecretsKeys.MU_PASSWORD to muPasswordField.text,
                 )
             )
+            settings.saveSettings(
+                mapOf(SettingsManager.SettingsKeys.MANGAUPDATES_IMPORT to muImportSettingsButtons.getSelectedIndex().toString())
+            )
             logArea.append("Saved.\n")
         }
 
-        val loadButton = JButton("Load from File")
+        val loadButton = JButton("Load MangaUpdate Settings")
         loadButton.alignmentX = CENTER_ALIGNMENT
         loadButton.alignmentY = CENTER_ALIGNMENT
         loadButton.addActionListener {
-            logArea.append("Loading MangaUpdates user credentials....\n")
+            logArea.append("Loading MangaUpdates settings....\n")
             settings.loadUserCredentials()
             muUsernameField.text = settings.secrets[SettingsManager.SecretsKeys.MU_USERNAME.name].toString()
             muPasswordField.text = settings.secrets[SettingsManager.SecretsKeys.MU_PASSWORD.name].toString()
+            settings.loadSettings()
+            muImportSettingsButtonGroup.clearSelection()
+            var selection = settings.config[SettingsManager.SettingsKeys.MANGAUPDATES_IMPORT.name].toString().toIntOrNull()
+            if(selection == null || selection < 0 || selection >= muImportSettingsButtons.size) selection = 0
+            muImportSettingsButtons[selection].isSelected = true
             logArea.append("Loaded.\n")
         }
 
@@ -650,6 +673,7 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
         saveLoadPanel.add(filler)
         saveLoadPanel.add(loadButton)
         mainPanel.add(muSettingsPanel)
+        mainPanel.add(importSettingsPanel)
         mainPanel.add(saveLoadPanel)
 
 
@@ -743,7 +767,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
                 "My_MangaDex_Follows",
                 exportOptions,
                 saveLinks,
-                muClient
+                muClient,
+                MangaUpdatesImportMethod.entries[muImportSettingsButtons.getSelectedIndex()]
             )
             runWorker.execute()
         }
@@ -784,7 +809,8 @@ class MangadexApiClientWorker(
     private val fileName: String,
     private val exportOptions: EnumSet<ExportOptions>,
     private val saveLinks: EnumSet<Links>,
-    private val muClient: MangaUpdatesAPI.Client? = null
+    private val muClient: MangaUpdatesAPI.Client? = null,
+    private val muImportMethod: MangaUpdatesImportMethod = MangaUpdatesImportMethod.TITLE
 ): SwingWorker<Boolean, Pair<String, LogType>>(){
     /**
      * Whether the worker is currently running or not.
@@ -840,7 +866,8 @@ class MangadexApiClientWorker(
      */
     @OptIn(DelicateCoroutinesApi::class)
     fun wrapper(list: MutableList<SimplifiedMangaInfo>) = GlobalScope.future{
-        exportMangaList(list, fileName, saveLinks, exportOptions, BufferingMode.PER_TITLE,muClient, ::publish)
+        exportMangaList(list, fileName, saveLinks, exportOptions, BufferingMode.PER_LIST, muClient,
+            muImportMethod, publish = ::publish)
     }
 
     /**
@@ -944,6 +971,15 @@ fun JTextPane.append(string: String, logType: LogType = LogType.STANDARD){
  */
 fun DefaultListModel<String>.toStringArray(): Array<String> {
     return Array<String>(this.size, {i -> "" + this[i]})
+}
+
+fun Array<JRadioButton>.getSelectedIndex(): Int{
+    for(i in 0..this.size-1){
+        if(this[i].isSelected){
+            return i
+        }
+    }
+    return -1
 }
 
 /**

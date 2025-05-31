@@ -4,7 +4,6 @@ import LogType
 import MangaUpdatesAPI.Client
 import MangaUpdatesAPI.Exceptions.UnexpectedMUApiResponseException
 import MangaUpdatesAPI.ResponseClasses.BulkTitleAddResponse
-import MangaUpdatesAPI.ResponseClasses.ListType
 import MangadexApi.Data.SimplifiedMangaInfo
 import io.ktor.client.call.body
 import kotlinx.coroutines.delay
@@ -70,7 +69,8 @@ enum class ExportOptions{
     /**
      * Exports it to MangaUpdates. See [MangaUpdatesAPI.Client.addTitlesToListByTitle] and [MangaUpdatesAPI.Client.addTitlesToListById].
      */
-    MANGAUPDATES
+    MANGAUPDATES,
+    MYANIMELIST
 }
 
 /**
@@ -116,7 +116,6 @@ suspend fun exportMangaList(
     var csvFile: Path? = null
     val makeTxt = exportOptions.contains(ExportOptions.TXT)
     val makeCsv = exportOptions.contains(ExportOptions.CSV)
-    val exportMangaUpdates = exportOptions.contains(ExportOptions.MANGAUPDATES)
     var titlesAdded = 0
     val nullLinks: MutableMap<Links, Int> = saveLinks.associateBy({it}, {0}).toMutableMap()
     if(makeCsv || makeTxt){
@@ -181,11 +180,14 @@ suspend fun exportMangaList(
             if(makeCsv) csvFile!!.appendText(csvLines)
         }
     }
-    if(exportMangaUpdates) {
+    if(exportOptions.contains(ExportOptions.MANGAUPDATES)) {
         when(muImportMethod){
             MangaUpdatesImportMethod.ID -> importToMangaUpdatesByID(muClient!!, mangaList, publish)
             MangaUpdatesImportMethod.TITLE -> importToMangaUpdatesByTitle(muClient!!, mangaList, publish)
         }
+    }
+    if(exportOptions.contains(ExportOptions.MYANIMELIST)) {
+        createMALFile(mangaList,fileName,publish)
     }
 }
 
@@ -249,7 +251,7 @@ fun writeToTextFile(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String
 
 /**
  * Imports a list of manga to MangaUpdates by their title. Not guaranteed to work for every series, even if MangaUpdates has that series, if the title has a typo, is in a different locale than what MangaUpdates stores, or other reasons.
- * @param mangaList The list of manga to export.
+ * @param mangaList The list of manga to import.
  * @param muClient The [MangaUpdatesAPI.Client] to be used if [ExportOptions.MANGAUPDATES] is set.
  * @param publish A function to consume logging information. Used for [MangadexApiClientWorker.publish].
  */
@@ -281,7 +283,7 @@ suspend fun importToMangaUpdatesByTitle(muClient: MangaUpdatesAPI.Client, mangaL
 
 /**
  * Imports a list of manga to MangaUpdates by their ID. Takes a long time.
- * @param mangaList The list of manga to export.
+ * @param mangaList The list of manga to import.
  * @param muClient The [MangaUpdatesAPI.Client] to be used if [ExportOptions.MANGAUPDATES] is set.
  * @param publish A function to consume logging information. Used for [MangadexApiClientWorker.publish].
  */
@@ -327,3 +329,31 @@ suspend fun importToMangaUpdatesByID(muClient: MangaUpdatesAPI.Client, mangaList
     }
 }
 
+/**
+ * Creates a file to import titles to MyAnimeList via https://myanimelist.net/import.php.
+ * @param mangaList The list of manga to import.
+ * @param publish A function to consume logging information. Used for [MangadexApiClientWorker.publish].
+ */
+fun createMALFile(mangaList: MutableList<SimplifiedMangaInfo>, fileName:String = "My_MangaDex_Follows", publish: ((Pair<String, LogType>)->Unit)? = null) {
+    var xml: String = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" +
+            "<myanimelist>" +
+            "<myinfo>" +
+            "<user_export_type>2</user_export_type>" +
+            "</myinfo>"
+    for(manga in mangaList){
+        if(manga.links == null || !manga.links.containsKey("mal")){
+            continue
+        }
+        xml += "<manga>" +
+                "<manga_mangadb_id>${manga.links["mal"].toString().trim{it=='"'||it.isWhitespace()}}</manga_mangadb_id>" +
+                "<update_on_import>1</update_on_import>" +
+                "</manga>"
+    }
+    xml += "</myanimelist>"
+    val homeDir: String = System.getProperty("user.home")
+    val mALFile = Path(homeDir, "${fileName}_${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy_MM_dd_HH_mm_ss"))}.xml")
+    with(mALFile){
+        createFile()
+        writeText(xml)
+    }
+}

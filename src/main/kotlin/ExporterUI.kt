@@ -48,7 +48,8 @@ class ExporterUI : JFrame("Mangadex Follows Exporter") {
     var exportOptionCheckboxes: Array<JCheckBox> = arrayOf(
         JCheckBox("txt"),
         JCheckBox("csv"),
-        JCheckBox("MangaUpdates")
+        JCheckBox("MangaUpdates"),
+        JCheckBox("MyAnimeList")
     )
     val exportAllCheckBox = JCheckBox("All")
 

@@ -336,17 +336,17 @@ suspend fun importToMangaUpdatesByID(muClient: MangaUpdatesAPI.Client, mangaList
  */
 fun createMALFile(mangaList: MutableList<SimplifiedMangaInfo>, fileName:String = "My_MangaDex_Follows", publish: ((Pair<String, LogType>)->Unit)? = null) {
     var xml: String = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" +
-            "<myanimelist>" +
-            "<myinfo>" +
-            "<user_export_type>2</user_export_type>" +
-            "</myinfo>"
+                            "<myanimelist>" +
+                                "<myinfo>" +
+                                    "<user_export_type>2</user_export_type>" +
+                                "</myinfo>"
     for(manga in mangaList){
         if(manga.links == null || !manga.links.containsKey("mal")){
             continue
         }
         xml += "<manga>" +
-                "<manga_mangadb_id>${manga.links["mal"].toString().trim{it=='"'||it.isWhitespace()}}</manga_mangadb_id>" +
-                "<update_on_import>1</update_on_import>" +
+                    "<manga_mangadb_id>${manga.links["mal"].toString().trim{it=='"'||it.isWhitespace()}}</manga_mangadb_id>" +
+                    "<update_on_import>1</update_on_import>" +
                 "</manga>"
     }
     xml += "</myanimelist>"

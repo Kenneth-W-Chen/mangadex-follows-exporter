@@ -15,6 +15,7 @@ val mainClass = "MainKt"
 repositories {
     mavenCentral()
 }
+
 val ktor_version: String by project
 dependencies {
     implementation("io.ktor:ktor-client-core:${ktor_version}")
@@ -30,9 +31,11 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
 kotlin {
     jvmToolchain(21)
 }
+
 tasks.withType<Jar>() {
     archiveFileName.set(jarName)
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -41,26 +44,6 @@ tasks.withType<Jar>() {
     }
     manifest {
         attributes["Main-Class"] = mainClass
-    }
-}
-
-/*tasks.register("teste"){
-    println(layout.buildDirectory.dir("libs").get())
-}*/
-
-abstract class CreateInstallerTask : Exec() {
-    @get:Input
-    abstract val types: Property<Array<String>>
-
-    @get:Input
-    abstract val name: Property<String>
-
-    @TaskAction
-    fun action() {
-        mkdir("build/distributables")
-        for (type in types.get()) {
-
-        }
     }
 }
 

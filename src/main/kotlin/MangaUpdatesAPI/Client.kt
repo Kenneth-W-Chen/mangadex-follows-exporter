@@ -68,7 +68,7 @@ class Client(private val username: String, private val password: String) {
             }
         }
         if(!response.status.isSuccess()){
-            throw UnexpectedMUApiResponseException("Unexpected response from server when fetching lists - ${response.status}: ${response.body<JsonObject>()["reason"]}")
+            throw UnexpectedMUApiResponseException("Unexpected response from server when fetching lists - ${response.status}: ${response.body<JsonObject>()["reason"]}",response)
         }
         return response.body<List<ListData>>()
     }
@@ -116,7 +116,7 @@ class Client(private val username: String, private val password: String) {
             }
         }
         if(!response.status.isSuccess()){
-            throw UnexpectedMUApiResponseException("Unexpected response from server when adding series - ${response.status}: ${response.body<JsonObject>()["reason"]}. Full response: ${response.body<JsonObject>()}")
+            throw UnexpectedMUApiResponseException("Unexpected response from server when adding series - ${response.status}: ${response.body<JsonObject>()["reason"]}. Full response: ${response.body<JsonObject>()}",response)
         }
         return response
     }
@@ -156,7 +156,7 @@ class Client(private val username: String, private val password: String) {
         }
 
         if(!response.status.isSuccess()){
-            throw UnexpectedMUApiResponseException("Unexpected response from server when adding series - ${response.status}: ${response.body<JsonObject>()["reason"]}. Full response: ${response.body<JsonObject>()}")
+            throw UnexpectedMUApiResponseException("Unexpected response from server when adding series - ${response.status}: ${response.body<JsonObject>()["reason"]}. Full response: ${response.body<JsonObject>()}",response)
         }
         return response
     }
@@ -208,7 +208,7 @@ class Client(private val username: String, private val password: String) {
             }
         }
         if(!response.status.isSuccess()){
-            throw UnexpectedMUApiResponseException("Unexpected response from server when fetching series ID by page ID ($pageId): ${response.status}: ${response.body<String>()}")
+            throw UnexpectedMUApiResponseException("Unexpected response from server when fetching series ID by page ID ($pageId): ${response.status}: ${response.body<String>()}",response)
         }
         return try {
             Regex("href=\"https:\\/\\/api.mangaupdates.com\\/v1\\/series\\/([0-9]+)\\/rss\">").find(response.body<String>())!!.groupValues[1]
@@ -248,7 +248,7 @@ class Client(private val username: String, private val password: String) {
             }
         }
         if(!response.status.isSuccess()){
-            throw UnexpectedMUApiResponseException("Unexpected response from server when making a new reading list: ${response.status}: ${response.body<String>()}")
+            throw UnexpectedMUApiResponseException("Unexpected response from server when making a new reading list: ${response.status}: ${response.body<String>()}",response)
         }
         return response.body<CreateCustomListResponse>().context.id
     }
@@ -290,7 +290,7 @@ class Client(private val username: String, private val password: String) {
             throw InvalidMUCredentialsException()
         }
         val responseBody = response.body<LoginResponseData>()
-        if(response.status != HttpStatusCode.OK) throw UnexpectedMUApiResponseException("Unexpected response from server when fetching session token - ${response.status}: ${responseBody.reason}")
+        if(response.status != HttpStatusCode.OK) throw UnexpectedMUApiResponseException("Unexpected response from server when fetching session token - ${response.status}: ${responseBody.reason}", response)
         return BearerTokens(responseBody.context!!.sessionToken, null)
     }
 

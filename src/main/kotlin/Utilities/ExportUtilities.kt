@@ -3,6 +3,7 @@ package Utilities
 import LogType
 import MangaUpdatesAPI.Client
 import MangaUpdatesAPI.Exceptions.UnexpectedMUApiResponseException
+import MangaUpdatesAPI.ResponseClasses.AddTitleByIDResponse
 import MangaUpdatesAPI.ResponseClasses.BulkTitleAddResponse
 import MangadexApi.Data.SimplifiedMangaInfo
 import io.ktor.client.call.body
@@ -118,15 +119,18 @@ suspend fun exportMangaList(
     val makeCsv = exportOptions.contains(ExportOptions.CSV)
     var titlesAdded = 0
     val nullLinks: MutableMap<Links, Int> = saveLinks.associateBy({it}, {0}).toMutableMap()
+    val now = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy_MM_dd_HH_mm_ss"))
     if(makeCsv || makeTxt){
-        val fileNameEnd: String = "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy_MM_dd_HH_mm_ss"))
+        val fileNameEnd: String = "_$now"
         if(makeTxt){
+            publish?.invoke(Pair("Making text file.\n", LogType.STANDARD))
             titlesFile = Path(homeDir, "${fileName}_$fileNameEnd.txt")
             titlesFile.createFile()
             linksFiles = saveLinks.associateBy({it}, { Path(homeDir, "${fileName}_${it.name}_$fileNameEnd.txt" )})
             linksFiles.forEach { it.value.createFile() }
         }
         if(makeCsv){
+            publish?.invoke(Pair("Making CSV file.\n", LogType.STANDARD))
             csvFile = Path(homeDir, "${fileName}_$fileNameEnd.csv")
             csvFile.createFile()
         }
@@ -182,12 +186,12 @@ suspend fun exportMangaList(
     }
     if(exportOptions.contains(ExportOptions.MANGAUPDATES)) {
         when(muImportMethod){
-            MangaUpdatesImportMethod.ID -> importToMangaUpdatesByID(muClient!!, mangaList, publish)
-            MangaUpdatesImportMethod.TITLE -> importToMangaUpdatesByTitle(muClient!!, mangaList, publish)
+            MangaUpdatesImportMethod.ID -> importToMangaUpdatesByID(muClient!!, mangaList, now, publish)
+            MangaUpdatesImportMethod.TITLE -> importToMangaUpdatesByTitle(muClient!!, mangaList, now, publish)
         }
     }
     if(exportOptions.contains(ExportOptions.MYANIMELIST)) {
-        createMALFile(mangaList,fileName,publish)
+        createMALFile(mangaList,now,fileName, publish)
     }
 }
 
@@ -255,10 +259,12 @@ fun writeToTextFile(mangaList:MutableList<SimplifiedMangaInfo>, fileName: String
  * @param muClient The [MangaUpdatesAPI.Client] to be used if [ExportOptions.MANGAUPDATES] is set.
  * @param publish A function to consume logging information. Used for [MangadexApiClientWorker.publish].
  */
-suspend fun importToMangaUpdatesByTitle(muClient: MangaUpdatesAPI.Client, mangaList: MutableList<SimplifiedMangaInfo>, publish: ((Pair<String, LogType>)->Unit)? = null) {
+suspend fun importToMangaUpdatesByTitle(muClient: MangaUpdatesAPI.Client, mangaList: MutableList<SimplifiedMangaInfo>, now:String, publish: ((Pair<String, LogType>)->Unit)? = null) {
     val readingListId = muClient.getListId("MangaDex Reading List")
     val titles: List<String> = mangaList.map { mangaInfo -> mangaInfo.title.trim({it == '\''||it=='"'||it=='\n'||it=='\r'||it==' '}) }
     publish?.invoke(Pair("Beginning MangaUpdates export...\n", LogType.STANDARD))
+    var failedTitles: String = ""
+    var failedTitlesCount: Int = 0
     for(i in 0..titles.size - 1 step 100){
         val toIndex = min(i + 100, titles.size)
         val titleCount = toIndex - i
@@ -266,11 +272,14 @@ suspend fun importToMangaUpdatesByTitle(muClient: MangaUpdatesAPI.Client, mangaL
         val response = muClient.addTitlesToListByTitle(titles.subList(i, toIndex), readingListId)
         val responseBody = response.body<BulkTitleAddResponse>()
         if(responseBody.status.startsWith("partial")) {
-            if(responseBody.context!!.errors.size == titleCount)
+            val errors = responseBody.context!!.errors.joinToString("\n\t", "\t")
+            failedTitles += "$errors\n"
+            failedTitlesCount += responseBody.context.errors.size
+            if(responseBody.context.errors.size == titleCount)
             {
-                publish?.invoke(Pair("Failed to add titles $i to ${toIndex - 1}.\n${responseBody.context.errors.joinToString("\n","\t")}", LogType.ERROR))
+                publish?.invoke(Pair("Failed to add titles $i to ${toIndex - 1}.\n$errors\n", LogType.ERROR))
             } else {
-                publish?.invoke(Pair("Failed to add some titles (${responseBody.context.errors.size} of $titleCount).\n${responseBody.context.errors.joinToString("\n","\t")}",LogType.WARNING))
+                publish?.invoke(Pair("Failed to add some titles (${responseBody.context.errors.size} of $titleCount).\n$errors\n",LogType.WARNING))
             }
         } else {
             publish?.invoke(Pair("Added $titleCount titles successfully\n", LogType.STANDARD))
@@ -279,6 +288,7 @@ suspend fun importToMangaUpdatesByTitle(muClient: MangaUpdatesAPI.Client, mangaL
 
         delay(5000)
     }
+    writeStats("MangaUpdates", mangaList.size, failedTitles, failedTitlesCount, now, importMethod="By Title")
 }
 
 /**
@@ -287,7 +297,7 @@ suspend fun importToMangaUpdatesByTitle(muClient: MangaUpdatesAPI.Client, mangaL
  * @param muClient The [MangaUpdatesAPI.Client] to be used if [ExportOptions.MANGAUPDATES] is set.
  * @param publish A function to consume logging information. Used for [MangadexApiClientWorker.publish].
  */
-suspend fun importToMangaUpdatesByID(muClient: MangaUpdatesAPI.Client, mangaList: MutableList<SimplifiedMangaInfo>, publish: ((Pair<String, LogType>)->Unit)? = null) {
+suspend fun importToMangaUpdatesByID(muClient: MangaUpdatesAPI.Client, mangaList: MutableList<SimplifiedMangaInfo>, now: String, publish: ((Pair<String, LogType>)->Unit)? = null) {
     val readingListId = muClient.getListId("MangaDex Reading List")
     val titleIds: MutableList<String> = mutableListOf()
     var estDuration = mangaList.size.toDouble() * 5.0 / 60.0
@@ -302,9 +312,13 @@ suspend fun importToMangaUpdatesByID(muClient: MangaUpdatesAPI.Client, mangaList
         durationUnits = "minute(s)"
     }
     publish?.invoke(Pair("Getting title IDs. This will take at least $estDuration $durationUnits.\n", LogType.STANDARD))
+    var ignoredTitles: String = ""
+    var ignoredTitlesCount: Int = 0
     for(manga in mangaList){
         if(manga.links == null || !manga.links.containsKey("mu")) {
             publish?.invoke(Pair("Ignoring ${manga.title} because it doesn't have a title\n", LogType.WARNING))
+            ignoredTitles += "\t\"${manga.title}\"\n"
+            ignoredTitlesCount++
             continue
         }
         publish?.invoke(Pair("Fetching ID for ${manga.title}\n", LogType.STANDARD))
@@ -315,6 +329,8 @@ suspend fun importToMangaUpdatesByID(muClient: MangaUpdatesAPI.Client, mangaList
         titleIds.add(id)
     }
     publish?.invoke(Pair("Beginning MangaUpdates export...\n", LogType.STANDARD))
+    var seriesErrors: String = ""
+    var errorCount: Int = 0
     for(i in 0..titleIds.size - 1 step 100){
         val toIndex = min(i + 100, titleIds.size)
         publish?.invoke(Pair("Exporting titles $i to ${toIndex-1}\n", LogType.STANDARD))
@@ -322,11 +338,15 @@ suspend fun importToMangaUpdatesByID(muClient: MangaUpdatesAPI.Client, mangaList
             val response = muClient.addTitlesToListById(titleIds.subList(i, toIndex), readingListId)
             publish?.invoke(Pair("Finished with response: ${response.body<String>()}\n", LogType.STANDARD))
         } catch (e: UnexpectedMUApiResponseException) {
-            publish?.invoke(Pair("Export of titles ($i -> ${toIndex-1}) failed due to a non-success code: $e\n", LogType.ERROR))
+            val responseBody = e.response.body<AddTitleByIDResponse>()
+            val seriesError = responseBody.context!!.errors.joinToString("\n\t", "\t")
+            publish?.invoke(Pair("Export of titles ($i -> ${toIndex-1}) failed due to a non-success code (${e.response.status}): ${responseBody.status} - ${responseBody.reason}\n$seriesError\n", LogType.ERROR))
+            seriesErrors += seriesError
+            errorCount += responseBody.context.errors.size
         }
-
         delay(5000)
     }
+    writeStats("MangaUpdates", mangaList.size,ignoredTitles,ignoredTitlesCount,now, "", seriesErrors, errorCount, "By ID")
 }
 
 /**
@@ -334,14 +354,18 @@ suspend fun importToMangaUpdatesByID(muClient: MangaUpdatesAPI.Client, mangaList
  * @param mangaList The list of manga to import.
  * @param publish A function to consume logging information. Used for [MangadexApiClientWorker.publish].
  */
-fun createMALFile(mangaList: MutableList<SimplifiedMangaInfo>, fileName:String = "My_MangaDex_Follows", publish: ((Pair<String, LogType>)->Unit)? = null) {
+fun createMALFile(mangaList: MutableList<SimplifiedMangaInfo>, now:String, fileName:String = "My_MangaDex_Follows", publish: ((Pair<String, LogType>)->Unit)? = null) {
     var xml: String = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" +
                             "<myanimelist>" +
                                 "<myinfo>" +
                                     "<user_export_type>2</user_export_type>" +
                                 "</myinfo>"
+    var ignoredTitles: String = ""
+    var ignoredTitlesCount: Int = 0
     for(manga in mangaList){
         if(manga.links == null || !manga.links.containsKey("mal")){
+            ignoredTitlesCount++
+            ignoredTitles += "\t\"${manga.title}\"\n"
             continue
         }
         xml += "<manga>" +
@@ -351,9 +375,27 @@ fun createMALFile(mangaList: MutableList<SimplifiedMangaInfo>, fileName:String =
     }
     xml += "</myanimelist>"
     val homeDir: String = System.getProperty("user.home")
-    val mALFile = Path(homeDir, "${fileName}_${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy_MM_dd_HH_mm_ss"))}.xml")
+    val mALFile = Path(homeDir, "${fileName}_$now.xml")
     with(mALFile){
         createFile()
         writeText(xml)
+    }
+    publish?.invoke(Pair("The following titles weren't added to the MyAnimeList import file because they didn't have a MyAnimeList ID:\n$ignoredTitles", LogType.WARNING))
+    writeStats("MyAnimeList", mangaList.size, ignoredTitles, ignoredTitlesCount, now, fileName)
+}
+
+fun writeStats(function:String, mangaTotal: Int, ignoredTitles: String, ignoredMangaTotal:Int, now:String, fileName: String = "", errors: String = "", errorCount: Int = 0, importMethod: String = "N/A") {
+    with(Path(System.getProperty("user.home"), "MD_Exporter_Stats_$now.txt")){
+        if(notExists()) createFile()
+        appendText("$function import stats:\n" +
+                "-------------------------\n")
+        if(fileName.isNotEmpty())
+            appendText("Filename: $fileName\n")
+        appendText("Selected import method: $importMethod\n" +
+                        "Manga imported: ${mangaTotal - ignoredMangaTotal} | Manga not imported: $ignoredMangaTotal | Total: ${mangaTotal}\n" +
+                        "Ignored titles:\n$ignoredTitles\n")
+        if(errors.isNotEmpty())
+            appendText("Errors ($errorCount):\n$errors\n")
+        appendText("-------------------------\n\n")
     }
 }

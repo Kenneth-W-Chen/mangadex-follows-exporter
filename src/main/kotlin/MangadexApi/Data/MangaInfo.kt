@@ -108,13 +108,21 @@ data class MangaInfo(
          * And I'm not writing my own reserializing logic for this garbage.
          */
         for (locale in titleLocalePreference) {
-            if (attributes.title[locale].toString() != "null") {
-                title = attributes.title[locale].toString()
+            val localePreference: String
+            if(locale.lowercase() == "original") {
+                localePreference = attributes.originalLanguage.toString()
+                if(localePreference == "null") continue
+            }
+            else
+                localePreference = locale.lowercase()
+
+            if (attributes.title[localePreference].toString() != "null") {
+                title = attributes.title[localePreference].toString()
                 break
             }
             if (attributes.altTitles.isNotEmpty()) {
                 val altTitle =
-                    attributes.altTitles.firstNotNullOfOrNull { t -> t.values.takeIf { t.containsKey(locale) } }
+                    attributes.altTitles.firstNotNullOfOrNull { t -> t.values.takeIf { t.containsKey(localePreference) } }
                 if (altTitle != null) {
                     title = altTitle.first().toString()
                     break
